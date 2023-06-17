@@ -1,8 +1,15 @@
-const IncomeSchema= require("../models/IncomeModel")
+const IncomeSchema= require("../models/IncomeModel");
 
+exports.basicRoute = async (req, res) =>{
+    try {
+        res.status(200).json("Working")
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'})
+    }
+};
 
 exports.addIncome = async (req, res) => {
-    const {title, amount, category, description, date}  = req.body
+    const {title, amount, category, description, date}  = req.body;
 
     const income = IncomeSchema({
         title,
