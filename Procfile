@@ -1,1 +1,1 @@
-web: nodemon ./app.js --omit=dev
+web: nodemon ./indexex.js --omit=dev
