@@ -1,6 +1,7 @@
 const {addExpense, getExpense, deleteExpense} = require('../controllers/expense');
 const {addIncome, getIncomes, deleteIncome} = require('../controllers/income');
 const {loginUser, registerUser} = require('../controllers/authController');
+const {addCategory, getCategories} = require('../controllers/category');
 const {getStats} = require('../controllers/stats');
 const jwt = require('jsonwebtoken');
 
@@ -33,6 +34,8 @@ const authenticateUser = (req, res, next) => {
 router.post('/add-income', authenticateUser, addIncome)
     .get('/get-incomes',authenticateUser, getIncomes)
     .delete('/delete-income/:id',authenticateUser, deleteIncome)
+    .post('/add-category',authenticateUser, addCategory)
+    .get('/get-categories',authenticateUser, getCategories)
     .post('/add-expense',authenticateUser, addExpense)
     .get('/get-expenses',authenticateUser, getExpense)
     .get('/get-stats',authenticateUser, getStats)
