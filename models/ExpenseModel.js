@@ -21,6 +21,10 @@ const ExpenseSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    sub_category: {
+        type: String,
+        trim: true
+    },
     description: {
         type: String,
         maxLength: 100,

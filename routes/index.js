@@ -1,8 +1,9 @@
-const {addExpense, getExpense, deleteExpense} = require('../controllers/expense');
-const {addIncome, getIncomes, deleteIncome} = require('../controllers/income');
-const {loginUser, registerUser} = require('../controllers/authController');
+const {addExpense, getExpense, deleteExpense, updateExpense} = require('../controllers/expense');
+const {addIncome, getIncomes, deleteIncome, updateIncome} = require('../controllers/income');
+const {loginUser, registerUser, verifyUser, resendOTP, updatePassword, updateProfile} = require('../controllers/authController');
 const {addCategory, getCategories} = require('../controllers/category');
-const {getStats} = require('../controllers/stats');
+const {addSubCategory, getSubCategories} = require('../controllers/subCategoryController');
+const {getStats, getProfile} = require('../controllers/Common');
 const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
@@ -34,13 +35,22 @@ const authenticateUser = (req, res, next) => {
 router.post('/add-income', authenticateUser, addIncome)
     .get('/get-incomes',authenticateUser, getIncomes)
     .delete('/delete-income/:id',authenticateUser, deleteIncome)
+    .put('/update-income/:id',authenticateUser, updateIncome)
     .post('/add-category',authenticateUser, addCategory)
+    .post('/add-sub-category',authenticateUser, addSubCategory)
     .get('/get-categories',authenticateUser, getCategories)
+    .get('/get-sub-categories',authenticateUser, getSubCategories)
     .post('/add-expense',authenticateUser, addExpense)
+    .put('/update-expense/:id',authenticateUser, updateExpense)
     .get('/get-expenses',authenticateUser, getExpense)
     .get('/get-stats',authenticateUser, getStats)
     .delete('/delete-expense/:id',authenticateUser, deleteExpense)
+    .get('/get-profile',authenticateUser, getProfile)
+    .post('/update-password',authenticateUser, updatePassword)
+    .post('/update-profile',authenticateUser, updateProfile)
+    .post('/resend-otp', resendOTP)
     .post('/login', loginUser)
+    .post('/verify-otp',verifyUser )
     .post('/register', registerUser);
 
 module.exports = router;
