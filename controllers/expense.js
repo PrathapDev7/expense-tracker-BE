@@ -2,7 +2,7 @@ const ExpenseSchema = require("../models/ExpenseModel");
 const moment = require('moment');
 
 exports.addExpense = async (req, res) => {
-    const {amount, category, description, date, sub_category}  = req.body;
+    const {amount, category, description, date, sub_category, type}  = req.body;
 
     const expense = ExpenseSchema({
         amount,
@@ -10,17 +10,11 @@ exports.addExpense = async (req, res) => {
         sub_category,
         description,
         date,
+        type,
         user: req.user.id,
     });
 
     try {
-        //validations
-        if(!category || !date){
-            return res.status(400).json({message: 'All fields are required!'})
-        }
-        if(amount <= 0 || !amount === 'number'){
-            return res.status(400).json({message: 'Amount must be a positive number!'})
-        }
         await expense.save();
         res.status(200).json({message: 'Expense Added'})
     } catch (error) {
@@ -29,7 +23,7 @@ exports.addExpense = async (req, res) => {
 };
 
 exports.updateExpense = async (req, res) => {
-    const { amount, category, description, date, sub_category } = req.body;
+    const { amount, category, description, date, sub_category, type } = req.body;
     const expenseId = req.params.id; // Assuming the expense ID is passed as a route parameter
 
     try {
@@ -39,21 +33,13 @@ exports.updateExpense = async (req, res) => {
             return res.status(404).json({ message: 'Expense not found' });
         }
 
-        // Perform validations on the updated data (similar to the addExpense function)
-        if (!category || !date) {
-            return res.status(400).json({ message: 'All fields are required!' });
-        }
-
-        if (typeof amount !== 'number' || amount <= 0) {
-            return res.status(400).json({ message: 'Amount must be a positive number!' });
-        }
-
         // Update the expense with the new data
         expense.amount = amount;
         expense.category = category;
         expense.sub_category = sub_category;
         expense.description = description;
         expense.date = date;
+        expense.type = type;
 
         // Save the updated expense to the database
         await expense.save();
@@ -66,7 +52,7 @@ exports.updateExpense = async (req, res) => {
 
 exports.getExpense = async (req, res) => {
     try {
-        const { start_date, end_date, keyword } = req.query;
+        const { start_date, end_date, keyword, type } = req.query;
         const query = { user: req.user.id };
 
         if (!start_date && !end_date) {
@@ -90,6 +76,10 @@ exports.getExpense = async (req, res) => {
                     { sub_category: keywordRegExp },
                 ];
             }
+        }
+
+        if(type) {
+            query.type = type
         }
 
         const expenses = await ExpenseSchema.find(query).sort({ createdAt: -1 });

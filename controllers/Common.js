@@ -4,6 +4,15 @@ const {combineAndSortByCreatedAt} = require("../Utils");
 const UserSchema = require('../models/UserModel');
 const moment = require('moment');
 
+exports.baseAction = async (req, res) => {
+    try {
+        res.status(200).json({data : "success"})
+    } catch
+        (error) {
+        res.status(500).json({message: 'Server Error'})
+    }
+}
+
 exports.getStats = async (req, res) => {
     try {
         const query = {user: req.user.id};

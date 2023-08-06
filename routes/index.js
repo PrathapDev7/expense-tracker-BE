@@ -1,9 +1,11 @@
+
 const {addExpense, getExpense, deleteExpense, updateExpense} = require('../controllers/expense');
 const {addIncome, getIncomes, deleteIncome, updateIncome} = require('../controllers/income');
+const {addUserBudget, getUserBudget, updateUserBudget} = require('../controllers/UserController');
 const {loginUser, registerUser, verifyUser, resendOTP, updatePassword, updateProfile} = require('../controllers/authController');
 const {addCategory, getCategories} = require('../controllers/category');
 const {addSubCategory, getSubCategories} = require('../controllers/subCategoryController');
-const {getStats, getProfile} = require('../controllers/Common');
+const {getStats, getProfile, baseAction} = require('../controllers/Common');
 const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
@@ -45,12 +47,16 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-expenses',authenticateUser, getExpense)
     .get('/get-stats',authenticateUser, getStats)
     .delete('/delete-expense/:id',authenticateUser, deleteExpense)
+    .get('/get-budgets',authenticateUser, getUserBudget)
+    .put('/update-budgets/:id',authenticateUser, updateUserBudget)
+    .post('/add-budgets',authenticateUser, addUserBudget)
     .get('/get-profile',authenticateUser, getProfile)
     .post('/update-password',authenticateUser, updatePassword)
     .post('/update-profile',authenticateUser, updateProfile)
     .post('/resend-otp', resendOTP)
     .post('/login', loginUser)
-    .post('/verify-otp',verifyUser )
-    .post('/register', registerUser);
+    .post('/verify-otp',verifyUser)
+    .post('/register', registerUser)
+    .get('/', baseAction);
 
 module.exports = router;
