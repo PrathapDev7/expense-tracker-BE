@@ -1,5 +1,19 @@
 const UserBudgetSchema = require("../models/UserBudgetModel");
+const UserSchema = require('../models/UserModel');
 const moment = require('moment');
+
+exports.getAllUsers = async (req, res) => {
+    const { page } = req.query;
+    const perPage = 10;
+    const skip = (page - 1) * perPage;
+
+    try {
+        const users = await UserSchema.find().skip(skip).limit(perPage);
+        res.status(200).json({response: users});
+    } catch (err) {
+        throw new Error('Error fetching users');
+    }
+};
 
 exports.addUserBudget = async (req, res) => {
     const {budgets}  = req.body;

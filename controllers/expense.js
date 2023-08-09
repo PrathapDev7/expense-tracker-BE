@@ -83,7 +83,10 @@ exports.getExpense = async (req, res) => {
         }
 
         const expenses = await ExpenseSchema.find(query).sort({ createdAt: -1 });
-        res.status(200).json(expenses);
+        res.status(200).json({
+            expenses,
+            total_expenses: !!expenses.length ? expenses.reduce((a, b) => a + b.amount, 0) : 0,
+        });
     } catch (error) {
         res.status(500).json({ message: error });
     }

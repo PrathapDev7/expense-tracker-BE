@@ -1,7 +1,6 @@
-
 const {addExpense, getExpense, deleteExpense, updateExpense} = require('../controllers/expense');
 const {addIncome, getIncomes, deleteIncome, updateIncome} = require('../controllers/income');
-const {addUserBudget, getUserBudget, updateUserBudget} = require('../controllers/UserController');
+const {addUserBudget, getUserBudget, updateUserBudget, getAllUsers} = require('../controllers/UserController');
 const {loginUser, registerUser, verifyUser, resendOTP, updatePassword, updateProfile} = require('../controllers/authController');
 const {addCategory, getCategories} = require('../controllers/category');
 const {addSubCategory, getSubCategories} = require('../controllers/subCategoryController');
@@ -57,6 +56,10 @@ router.post('/add-income', authenticateUser, addIncome)
     .post('/login', loginUser)
     .post('/verify-otp',verifyUser)
     .post('/register', registerUser)
-    .get('/', baseAction);
+    .get('/', baseAction)
+
+    //admin
+    .get("/admin/all-users",authenticateUser, getAllUsers)
+;
 
 module.exports = router;
