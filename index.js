@@ -18,7 +18,7 @@ index.use(cors());
 readdirSync('./routes').map((route) => index.use('/api/v1/', require('./routes/' + route)));
 
 // Cron job to keep the API server active by pinging the server itself every minute
-cron.schedule('* * * * *', async () => {
+cron.schedule('* 6-23 * * *', async () => {
     try {
         const serverUrl = `https://expense-tracker-be-3rvm.onrender.com/api/v1/`;  // Make sure this is an actual route
         await axios.get(serverUrl);
