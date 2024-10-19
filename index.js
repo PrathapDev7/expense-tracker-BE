@@ -18,10 +18,10 @@ index.use(cors());
 readdirSync('./routes').map((route) => index.use('/api/v1/', require('./routes/' + route)));
 
 // Add the cron job to run every 1 minute
-cron.schedule('* * * * *', () => {
-    console.log('Updating server...');
-    return baseAction();
-});
+// cron.schedule('* * * * *', () => {
+//     console.log('Updating server...');
+//     return baseAction();
+// });
 
 const server = () => {
     db();
