@@ -19,7 +19,7 @@ index.use(cors());
 readdirSync('./routes').map((route) => index.use('/api/v1/', require('./routes/' + route)));
 
 // Ping the server from 6 AM to 12 AM every minute
-cron.schedule('* 6-23 * * *', async () => {
+cron.schedule('* 6-24 * * *', async () => {
     try {
         const serverUrl = `https://expense-tracker-be-3rvm.onrender.com/api/v1/`;  // Make sure this route exists
         await axios.get(serverUrl);
