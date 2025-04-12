@@ -28,46 +28,61 @@ const generateOTP = () => {
 
 // User registration controller
 const registerUser = async (req, res) => {
-    const {email, password, username} = req.body;
+    const { email, password, username } = req.body;
+
     try {
-        const existingUser = await UserSchema.findOne({email});
+        const existingUser = await UserSchema.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({message: 'Email already registered.'});
+            return res.status(400).json({ message: 'Email already registered.' });
         }
 
-        const otp = generateOTP();
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        let response = {
-          body : {
-              name : username,
-              intro : `Your OTP for registration is: ${otp}`
-          }
+        const newUser = new UserSchema({
+            email,
+            username,
+            password: hashedPassword,
+            verified: false
+        });
+
+        await newUser.save();
+
+        // Send email verification
+        const link = `${process.env.BASE_URL}/verify-email?email=${email}`;
+        const response = {
+            body: {
+                name: username,
+                intro: 'Welcome to Wealthify!',
+                action: {
+                    instructions: 'To verify your email, click the button below:',
+                    button: {
+                        color: '#FFD700',
+                        text: 'Verify Email',
+                        link
+                    }
+                }
+            }
         };
 
-        let mail = MailGenerator.generate(response);
+        const mail = MailGenerator.generate(response);
 
         const mailOptions = {
             from: process.env.EMAIL,
             to: email,
-            subject: 'Wealthify - OTP Verification',
-            html : mail
+            subject: 'Wealthify - Verify Your Email',
+            html: mail
         };
 
-        // Send the email
         await transporter.sendMail(mailOptions);
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        res.status(201).json({ message: 'Registration successful. Please check your email to verify your account.' });
 
-        const newUser = new UserSchema({email, username, password: hashedPassword, otp});
-
-        await newUser.save();
-
-        res.status(201).json({message: 'Please check your email for OTP verification.'});
     } catch (error) {
-        res.status(500).json({message: 'Error registering user.', error: error});
+        console.error('Register Error:', error);
+        res.status(500).json({ message: 'Internal server error.' });
     }
 };
+
 
 // User verification controller
 const verifyUser = async (req, res) => {
@@ -103,6 +118,32 @@ const verifyUser = async (req, res) => {
         res.status(500).json({message: 'Error verifying OTP.', error });
     }
 };
+
+const verifyEmail = async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const user = await UserSchema.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        if (user.verified) {
+            return res.status(200).json({ message: 'Email already verified.' });
+        }
+
+        user.verified = true;
+        await user.save();
+
+        res.status(200).json({ message: 'Email successfully verified.' });
+
+    } catch (error) {
+        console.error('Verification Error:', error);
+        res.status(500).json({ message: 'Internal server error.' });
+    }
+};
+
 
 // User login controller
 const loginUser = async (req, res) => {
@@ -240,5 +281,6 @@ module.exports = {
     resendOTP,
     loginUser,
     updatePassword,
-    updateProfile
+    updateProfile,
+    verifyEmail
 };
