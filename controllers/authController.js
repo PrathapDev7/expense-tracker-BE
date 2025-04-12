@@ -75,7 +75,16 @@ const registerUser = async (req, res) => {
 
         await transporter.sendMail(mailOptions);
 
-        res.status(201).json({ message: 'Registration successful. Please check your email to verify your account.' });
+        const userObj = {
+            id: newUser._id,
+            email: newUser.email,
+            username: newUser.username,
+        };
+
+        const token = jwt.sign(userObj,
+            process.env.JWT_TOKEN);
+
+        res.status(200).json({message: 'Account created successfully.', data : userObj , token});
 
     } catch (error) {
         console.error('Register Error:', error);
