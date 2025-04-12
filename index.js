@@ -18,15 +18,15 @@ index.use(cors());
 readdirSync('./routes').map((route) => index.use('/api/v1/', require('./routes/' + route)));
 
 // Cron job to keep the API server active by pinging the server itself every minute
-cron.schedule('* * * * *', async () => {
-    try {
-        const serverUrl = `https://expense-tracker-be-3rvm.onrender.com/api/v1/`;  // Make sure this is an actual route
-        await axios.get(serverUrl);
-        console.log(`Pinged server at ${serverUrl} to keep it active.`);
-    } catch (error) {
-        console.error('Error pinging server:', error.message);
-    }
-});
+// cron.schedule('* * * * *', async () => {
+//     try {
+//         const serverUrl = `https://expense-tracker-be-3rvm.onrender.com/api/v1/`;  // Make sure this is an actual route
+//         await axios.get(serverUrl);
+//         console.log(`Pinged server at ${serverUrl} to keep it active.`);
+//     } catch (error) {
+//         console.error('Error pinging server:', error.message);
+//     }
+// });
 
 const server = () => {
     db();
