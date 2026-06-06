@@ -1,4 +1,6 @@
 const CategorySchema = require("../models/CategoryModel");
+const IncomeSchema = require("../models/IncomeModel");
+const ExpenseSchema = require("../models/ExpenseModel");
 
 
 exports.addCategory = async (req, res) => {
@@ -23,5 +25,34 @@ exports.getCategories = async (req, res) =>{
         res.status(200).json(categories)
     } catch (error) {
         res.status(500).json({message: 'Server Error'})
+    }
+};
+
+exports.getRecentCategories = async (req, res) => {
+    try {
+        const {type} = req.query;
+        const Model = type === 'income' ? IncomeSchema : ExpenseSchema;
+        const records = await Model.find({
+            user: req.user.id,
+            category: {$exists: true, $ne: ''},
+        })
+            .sort({createdAt: -1})
+            .limit(50)
+            .select('category')
+            .lean();
+
+        const seen = new Set();
+        const categories = records.reduce((acc, record) => {
+            const title = (record.category || '').trim();
+            const key = title.toLowerCase();
+            if (!title || seen.has(key)) return acc;
+            seen.add(key);
+            acc.push({title});
+            return acc;
+        }, []);
+
+        res.status(200).json(categories);
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
     }
 };

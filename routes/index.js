@@ -1,9 +1,8 @@
 const {addExpense, getExpense, deleteExpense, updateExpense} = require('../controllers/expense');
 const {addIncome, getIncomes, deleteIncome, updateIncome} = require('../controllers/income');
-const {addUserBudget, getUserBudget, updateUserBudget, getAllUsers} = require('../controllers/UserController');
-const {loginUser, registerUser, verifyUser, resendOTP, updatePassword, updateProfile, verifyEmail} = require('../controllers/authController');
-const {addCategory, getCategories} = require('../controllers/category');
-const {addSubCategory, getSubCategories} = require('../controllers/subCategoryController');
+const {addUserBudget, getUserBudget, updateUserBudget} = require('../controllers/UserController');
+const {loginUser, registerUser, updatePassword, updateProfile} = require('../controllers/authController');
+const {addCategory, getCategories, getRecentCategories} = require('../controllers/category');
 const {getStats, getProfile, baseAction} = require('../controllers/Common');
 const jwt = require('jsonwebtoken');
 
@@ -38,9 +37,8 @@ router.post('/add-income', authenticateUser, addIncome)
     .delete('/delete-income/:id',authenticateUser, deleteIncome)
     .put('/update-income/:id',authenticateUser, updateIncome)
     .post('/add-category',authenticateUser, addCategory)
-    .post('/add-sub-category',authenticateUser, addSubCategory)
     .get('/get-categories',authenticateUser, getCategories)
-    .get('/get-sub-categories',authenticateUser, getSubCategories)
+    .get('/get-recent-categories',authenticateUser, getRecentCategories)
     .post('/add-expense',authenticateUser, addExpense)
     .put('/update-expense/:id',authenticateUser, updateExpense)
     .get('/get-expenses',authenticateUser, getExpense)
@@ -52,15 +50,9 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-profile',authenticateUser, getProfile)
     .post('/update-password',authenticateUser, updatePassword)
     .post('/update-profile',authenticateUser, updateProfile)
-    .post('/resend-otp', resendOTP)
     .post('/login', loginUser)
-    .post('/verify-otp',verifyUser)
-    .post('/verify-email',verifyEmail)
     .post('/register', registerUser)
     .get('/', baseAction)
-
-    //admin
-    .get("/admin/all-users",authenticateUser, getAllUsers)
 ;
 
 module.exports = router;
