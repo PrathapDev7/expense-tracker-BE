@@ -5,7 +5,6 @@ const {loginUser, registerUser, updatePassword, updateProfile} = require('../con
 const {addCategory, getCategories, getRecentCategories} = require('../controllers/category');
 const {addSubCategory, getSubCategories} = require('../controllers/subCategory');
 const {getStats, getProfile, baseAction} = require('../controllers/Common');
-const {uploadImage, uploadImageMiddleware} = require('../controllers/upload');
 const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
@@ -54,7 +53,6 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-profile',authenticateUser, getProfile)
     .post('/update-password',authenticateUser, updatePassword)
     .post('/update-profile',authenticateUser, updateProfile)
-    .post('/upload-image', authenticateUser, uploadImageMiddleware, uploadImage)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
