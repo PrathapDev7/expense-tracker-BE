@@ -2,11 +2,12 @@ const ExpenseSchema = require("../models/ExpenseModel");
 const moment = require('moment');
 
 exports.addExpense = async (req, res) => {
-    const {amount, category, description, date, type}  = req.body;
+    const {amount, category, sub_category, description, date, type}  = req.body;
 
     const expense = ExpenseSchema({
         amount,
         category,
+        sub_category,
         description,
         date,
         type,
@@ -22,7 +23,7 @@ exports.addExpense = async (req, res) => {
 };
 
 exports.updateExpense = async (req, res) => {
-    const { amount, category, description, date, type } = req.body;
+    const { amount, category, sub_category, description, date, type } = req.body;
     const expenseId = req.params.id;
 
     try {
@@ -33,6 +34,7 @@ exports.updateExpense = async (req, res) => {
 
         expense.amount = amount;
         expense.category = category;
+        expense.sub_category = sub_category;
         expense.description = description;
         expense.date = date;
         expense.type = type;
@@ -66,6 +68,7 @@ exports.getExpense = async (req, res) => {
                 query.$or = [
                     { description: keywordRegExp },
                     { category: keywordRegExp },
+                    { sub_category: keywordRegExp },
                 ];
             }
         }
