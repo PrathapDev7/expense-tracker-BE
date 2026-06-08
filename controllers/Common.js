@@ -2,6 +2,7 @@ const IncomeSchema = require("../models/IncomeModel");
 const ExpenseSchema = require("../models/ExpenseModel");
 const {combineAndSortByCreatedAt} = require("../Utils");
 const UserSchema = require('../models/UserModel');
+const {materializeRecurring} = require('./recurring');
 const moment = require('moment');
 
 exports.baseAction = async (req, res) => {
@@ -14,6 +15,9 @@ exports.baseAction = async (req, res) => {
 
 exports.getStats = async (req, res) => {
     try {
+        // Lazily generate any due recurring transactions before computing stats.
+        await materializeRecurring(req.user.id);
+
         const query = {user: req.user.id};
         const start_date = moment().startOf('month').format("YYYY-MM-DD");
         const end_date = moment().endOf('month').format("YYYY-MM-DD");

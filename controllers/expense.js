@@ -2,7 +2,7 @@ const ExpenseSchema = require("../models/ExpenseModel");
 const moment = require('moment');
 
 exports.addExpense = async (req, res) => {
-    const {amount, category, sub_category, description, date, type}  = req.body;
+    const {amount, category, sub_category, description, date, type, account}  = req.body;
 
     const expense = ExpenseSchema({
         amount,
@@ -11,6 +11,7 @@ exports.addExpense = async (req, res) => {
         description,
         date,
         type,
+        account,
         user: req.user.id,
     });
 
@@ -23,7 +24,7 @@ exports.addExpense = async (req, res) => {
 };
 
 exports.updateExpense = async (req, res) => {
-    const { amount, category, sub_category, description, date, type } = req.body;
+    const { amount, category, sub_category, description, date, type, account } = req.body;
     const expenseId = req.params.id;
 
     try {
@@ -38,6 +39,7 @@ exports.updateExpense = async (req, res) => {
         expense.description = description;
         expense.date = date;
         expense.type = type;
+        if (account !== undefined) expense.account = account;
 
         await expense.save();
 
@@ -49,7 +51,7 @@ exports.updateExpense = async (req, res) => {
 
 exports.getExpense = async (req, res) => {
     try {
-        const { start_date, end_date, keyword, type } = req.query;
+        const { start_date, end_date, keyword, type, category, account, min_amount, max_amount } = req.query;
         const query = { user: req.user.id };
 
         if (!start_date && !end_date) {
@@ -75,6 +77,23 @@ exports.getExpense = async (req, res) => {
 
         if(type) {
             query.type = type
+        }
+
+        if (category) {
+            query.category = category;
+        }
+
+        if (account) {
+            query.account = account;
+        }
+
+        // Amount range filter — skipped if an exact amount was set by keyword.
+        const min = min_amount !== undefined ? parseFloat(min_amount) : NaN;
+        const max = max_amount !== undefined ? parseFloat(max_amount) : NaN;
+        if ((!isNaN(min) || !isNaN(max)) && query.amount === undefined) {
+            query.amount = {};
+            if (!isNaN(min)) query.amount.$gte = min;
+            if (!isNaN(max)) query.amount.$lte = max;
         }
 
         const expenses = await ExpenseSchema.find(query).sort({ createdAt: -1 });

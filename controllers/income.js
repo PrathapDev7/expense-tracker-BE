@@ -2,13 +2,14 @@ const IncomeSchema = require("../models/IncomeModel");
 const moment = require('moment');
 
 exports.addIncome = async (req, res) => {
-    const {title, amount, category, description, date} = req.body;
+    const {title, amount, category, description, date, account} = req.body;
     const income = IncomeSchema({
         title,
         amount,
         category,
         description,
         date,
+        account,
         user: req.user.id,
     });
 
@@ -27,7 +28,7 @@ exports.addIncome = async (req, res) => {
 };
 
 exports.updateIncome = async (req, res) => {
-    const {title, amount, category, description, date} = req.body;
+    const {title, amount, category, description, date, account} = req.body;
     const incomeId = req.params.id;
 
     try {
@@ -48,6 +49,7 @@ exports.updateIncome = async (req, res) => {
         income.category = category;
         income.description = description;
         income.date = date;
+        if (account !== undefined) income.account = account;
         await income.save();
 
         res.status(200).json({message: 'Income updated successfully'});
@@ -58,7 +60,7 @@ exports.updateIncome = async (req, res) => {
 
 exports.getIncomes = async (req, res) => {
     try {
-        const {start_date, end_date, keyword} = req.query;
+        const {start_date, end_date, keyword, category, account, min_amount, max_amount} = req.query;
         const query = {user: req.user.id};
 
         if (!start_date && !end_date) {
@@ -80,6 +82,22 @@ exports.getIncomes = async (req, res) => {
                     {title: keywordRegExp},
                 ];
             }
+        }
+
+        if (category) {
+            query.category = category;
+        }
+
+        if (account) {
+            query.account = account;
+        }
+
+        const min = min_amount !== undefined ? parseFloat(min_amount) : NaN;
+        const max = max_amount !== undefined ? parseFloat(max_amount) : NaN;
+        if ((!isNaN(min) || !isNaN(max)) && query.amount === undefined) {
+            query.amount = {};
+            if (!isNaN(min)) query.amount.$gte = min;
+            if (!isNaN(max)) query.amount.$lte = max;
         }
 
         const incomes = await IncomeSchema.find(query).sort({createdAt: -1});

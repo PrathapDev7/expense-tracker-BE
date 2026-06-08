@@ -32,6 +32,10 @@ const IncomeSchema = new mongoose.Schema({
         maxLength: 100,
         trim: true
     },
+    account: {
+        type: String,
+        trim: true
+    },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -2,9 +2,14 @@ const {addExpense, getExpense, deleteExpense, updateExpense} = require('../contr
 const {addIncome, getIncomes, deleteIncome, updateIncome} = require('../controllers/income');
 const {addUserBudget, getUserBudget, updateUserBudget} = require('../controllers/UserController');
 const {loginUser, registerUser, updatePassword, updateProfile} = require('../controllers/authController');
-const {addCategory, getCategories, getRecentCategories} = require('../controllers/category');
+const {addCategory, getCategories, getRecentCategories, updateCategory, deleteCategory} = require('../controllers/category');
 const {addSubCategory, getSubCategories} = require('../controllers/subCategory');
 const {getStats, getProfile, baseAction} = require('../controllers/Common');
+const {uploadImage, uploadImageMiddleware} = require('../controllers/upload');
+const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('../controllers/recurring');
+const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
+const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
+const {getInsights} = require('../controllers/insights');
 const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
@@ -40,6 +45,8 @@ router.post('/add-income', authenticateUser, addIncome)
     .post('/add-category',authenticateUser, addCategory)
     .get('/get-categories',authenticateUser, getCategories)
     .get('/get-recent-categories',authenticateUser, getRecentCategories)
+    .put('/update-category/:id',authenticateUser, updateCategory)
+    .delete('/delete-category/:id',authenticateUser, deleteCategory)
     .post('/add-sub-category',authenticateUser, addSubCategory)
     .get('/get-sub-categories',authenticateUser, getSubCategories)
     .post('/add-expense',authenticateUser, addExpense)
@@ -50,9 +57,24 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-budgets',authenticateUser, getUserBudget)
     .put('/update-budgets/:id',authenticateUser, updateUserBudget)
     .post('/add-budgets',authenticateUser, addUserBudget)
+    .post('/add-recurring',authenticateUser, addRecurring)
+    .get('/get-recurring',authenticateUser, getRecurring)
+    .put('/update-recurring/:id',authenticateUser, updateRecurring)
+    .delete('/delete-recurring/:id',authenticateUser, deleteRecurring)
+    .post('/add-goal',authenticateUser, addGoal)
+    .get('/get-goals',authenticateUser, getGoals)
+    .put('/update-goal/:id',authenticateUser, updateGoal)
+    .post('/contribute-goal/:id',authenticateUser, contributeGoal)
+    .delete('/delete-goal/:id',authenticateUser, deleteGoal)
+    .post('/add-wallet',authenticateUser, addWallet)
+    .get('/get-wallets',authenticateUser, getWallets)
+    .put('/update-wallet/:id',authenticateUser, updateWallet)
+    .delete('/delete-wallet/:id',authenticateUser, deleteWallet)
+    .get('/get-insights',authenticateUser, getInsights)
     .get('/get-profile',authenticateUser, getProfile)
     .post('/update-password',authenticateUser, updatePassword)
     .post('/update-profile',authenticateUser, updateProfile)
+    .post('/upload-image', authenticateUser, uploadImageMiddleware, uploadImage)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
