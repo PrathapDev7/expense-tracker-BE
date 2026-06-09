@@ -29,6 +29,39 @@ const WalletSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    provider: {
+        type: String,
+        trim: true,
+    },
+    providerName: {
+        type: String,
+        trim: true,
+    },
+    cardType: {
+        type: String,
+        enum: ['', 'credit', 'debit'],
+        default: '',
+    },
+    last4: {
+        type: String,
+        trim: true,
+        maxLength: 4,
+    },
+    holderName: {
+        type: String,
+        trim: true,
+        maxLength: 60,
+    },
+    reminderDay: {
+        type: Number,
+        min: 1,
+        max: 31,
+    },
+    expiry: {
+        type: String,
+        trim: true,
+        maxLength: 5,
+    },
     archived: {
         type: Boolean,
         default: false,

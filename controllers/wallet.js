@@ -4,7 +4,10 @@ const ExpenseSchema = require('../models/ExpenseModel');
 const IncomeSchema = require('../models/IncomeModel');
 
 exports.addWallet = async (req, res) => {
-    const {name, kind, openingBalance, icon, color} = req.body;
+    const {
+        name, kind, openingBalance, icon, color,
+        provider, providerName, cardType, last4, holderName, reminderDay, expiry,
+    } = req.body;
     try {
         if (!name) {
             return res.status(400).json({message: 'Wallet name is required.'});
@@ -16,6 +19,13 @@ exports.addWallet = async (req, res) => {
             openingBalance: openingBalance || 0,
             icon,
             color,
+            provider,
+            providerName,
+            cardType: cardType || '',
+            last4,
+            holderName,
+            reminderDay,
+            expiry,
         });
         res.status(200).json({message: 'Wallet added', data: wallet});
     } catch (error) {
@@ -66,7 +76,11 @@ exports.getWallets = async (req, res) => {
 
 exports.updateWallet = async (req, res) => {
     const {id} = req.params;
-    const allowed = ['name', 'kind', 'openingBalance', 'icon', 'color', 'archived'];
+    const allowed = [
+        'name', 'kind', 'openingBalance', 'icon', 'color', 'archived',
+        'provider', 'providerName', 'cardType', 'last4', 'holderName',
+        'reminderDay', 'expiry',
+    ];
     try {
         const wallet = await WalletSchema.findOne({_id: id, user: req.user.id});
         if (!wallet) {
