@@ -10,6 +10,11 @@ const mongoose = require('mongoose');
             type: String,
             required: true
         },
+        email: {
+            type: String,
+            unique: true,
+            sparse: true
+        },
         password: {
             type: String,
             required: true
