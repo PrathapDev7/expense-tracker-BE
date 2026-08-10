@@ -2,6 +2,7 @@ const moment = require('moment');
 const RecurringSchema = require('../models/RecurringModel');
 const ExpenseSchema = require('../models/ExpenseModel');
 const IncomeSchema = require('../models/IncomeModel');
+const {resolveWallet, resolveWalletId, WalletValidationError} = require('../middlewares/wallet');
 
 const DATE_FMT = 'YYYY-MM-DD';
 const FREQ_UNIT = {daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years'};
@@ -22,10 +23,32 @@ const materializeRecurring = async (userId) => {
         nextRunDate: {$lte: today},
     });
 
+    // Resolve each rule's wallet once. The rule's own `account` wins; when it
+    // is missing or its wallet was archived, fall back to the user's primary.
+    const accountByRule = new Map();
+    for (const rule of rules) {
+        try {
+            const wallet = await resolveWallet(userId, rule.account);
+            accountByRule.set(String(rule._id), wallet ? String(wallet._id) : null);
+        } catch (e) {
+            // Rule's wallet no longer resolvable — fall back to the primary.
+            const primary = await resolveWallet(userId, undefined);
+            accountByRule.set(String(rule._id), primary ? String(primary._id) : null);
+        }
+    }
+
     for (const rule of rules) {
         let guard = 0; // safety against runaway loops
         while (rule.active && rule.nextRunDate <= today && guard < 750) {
             if (rule.endDate && rule.nextRunDate > rule.endDate) {
+                rule.active = false;
+                break;
+            }
+
+            const account = accountByRule.get(String(rule._id));
+            if (!account) {
+                // No wallet available for this rule — skip the occurrence so we
+                // never create a wallet-less transaction.
                 rule.active = false;
                 break;
             }
@@ -38,13 +61,13 @@ const materializeRecurring = async (userId) => {
                 date: rule.nextRunDate,
                 user: userId,
                 type: rule.type || (rule.kind === 'income' ? 'income' : 'self'),
+                account,
             };
             if (rule.kind === 'income') {
                 doc.title = rule.title;
             } else {
                 doc.sub_category = rule.sub_category;
             }
-            if (rule.account) doc.account = rule.account;
 
             await Model.create(doc);
 
@@ -69,6 +92,7 @@ exports.addRecurring = async (req, res) => {
         if (!FREQ_UNIT[frequency]) {
             return res.status(400).json({message: 'Invalid frequency.'});
         }
+        const resolvedAccount = await resolveWalletId(req.user.id, account);
 
         const rule = await RecurringSchema.create({
             user: req.user.id,
@@ -79,7 +103,7 @@ exports.addRecurring = async (req, res) => {
             title,
             description,
             type,
-            account,
+            account: resolvedAccount,
             frequency,
             interval: interval || 1,
             startDate,
@@ -92,6 +116,9 @@ exports.addRecurring = async (req, res) => {
 
         res.status(200).json({message: 'Recurring added', data: rule});
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({message: error.message});
+        }
         res.status(500).json({message: 'Server Error'});
     }
 };
@@ -120,10 +147,20 @@ exports.updateRecurring = async (req, res) => {
             if (req.body[key] !== undefined) rule[key] = req.body[key];
         });
         if (req.body.category !== undefined) rule.category = (req.body.category || '').trim();
+
+        // Re-resolve the wallet whenever it changed; a missing account falls
+        // back to the user's primary so rules never end up wallet-less.
+        if (req.body.account !== undefined) {
+            rule.account = await resolveWalletId(req.user.id, req.body.account, {required: false})
+                || rule.account;
+        }
         await rule.save();
 
         res.status(200).json({message: 'Recurring updated', data: rule});
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({message: error.message});
+        }
         res.status(500).json({message: 'Server Error'});
     }
 };

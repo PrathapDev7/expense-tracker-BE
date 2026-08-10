@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserSchema = require('../models/UserModel');
+const WalletSchema = require('../models/WalletModel');
 
 const registerUser = async (req, res) => {
     const { mobile, password, username } = req.body;
@@ -24,6 +25,17 @@ const registerUser = async (req, res) => {
         });
 
         await newUser.save();
+
+        // Every user starts with a default wallet so income/expense (which now
+        // require a wallet) always have somewhere to go. It is the user's
+        // primary until they add and mark another wallet as primary.
+        await WalletSchema.create({
+            user: newUser._id,
+            name: 'Wealthify Wallet',
+            kind: 'wallet',
+            openingBalance: 0,
+            isPrimary: true,
+        });
 
         const userObj = {
             id: newUser._id,

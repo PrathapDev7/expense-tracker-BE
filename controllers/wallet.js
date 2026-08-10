@@ -12,6 +12,8 @@ exports.addWallet = async (req, res) => {
         if (!name) {
             return res.status(400).json({message: 'Wallet name is required.'});
         }
+        // The first wallet a user creates becomes their primary.
+        const walletCount = await WalletSchema.countDocuments({user: req.user.id});
         const wallet = await WalletSchema.create({
             user: req.user.id,
             name: name.trim(),
@@ -26,6 +28,7 @@ exports.addWallet = async (req, res) => {
             holderName,
             reminderDay,
             expiry,
+            isPrimary: walletCount === 0,
         });
         res.status(200).json({message: 'Wallet added', data: wallet});
     } catch (error) {
@@ -79,13 +82,22 @@ exports.updateWallet = async (req, res) => {
     const allowed = [
         'name', 'kind', 'openingBalance', 'icon', 'color', 'archived',
         'provider', 'providerName', 'cardType', 'last4', 'holderName',
-        'reminderDay', 'expiry',
+        'reminderDay', 'expiry', 'isPrimary',
     ];
     try {
         const wallet = await WalletSchema.findOne({_id: id, user: req.user.id});
         if (!wallet) {
             return res.status(404).json({message: 'Wallet not found'});
         }
+
+        // Only one wallet can be primary — clear the others first.
+        if (req.body.isPrimary === true) {
+            await WalletSchema.updateMany(
+                {user: req.user.id, _id: {$ne: id}},
+                {$set: {isPrimary: false}}
+            );
+        }
+
         allowed.forEach((key) => {
             if (req.body[key] !== undefined) wallet[key] = req.body[key];
         });
@@ -108,6 +120,16 @@ exports.deleteWallet = async (req, res) => {
         );
         if (!wallet) {
             return res.status(404).json({message: 'Wallet not found'});
+        }
+
+        // If the primary wallet was archived, promote the oldest remaining one
+        // so the user is never left without a primary.
+        if (wallet.isPrimary) {
+            await WalletSchema.findOneAndUpdate(
+                {user: req.user.id, archived: {$ne: true}, _id: {$ne: id}},
+                {$set: {isPrimary: true}},
+                {sort: {createdAt: 1}}
+            );
         }
         res.status(200).json({message: 'Wallet deleted'});
     } catch (error) {

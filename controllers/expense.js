@@ -1,24 +1,29 @@
 const ExpenseSchema = require("../models/ExpenseModel");
+const {resolveWalletId, WalletValidationError} = require('../middlewares/wallet');
 const moment = require('moment');
 
 exports.addExpense = async (req, res) => {
     const {amount, category, sub_category, description, date, type, account}  = req.body;
 
-    const expense = ExpenseSchema({
-        amount,
-        category,
-        sub_category,
-        description,
-        date,
-        type,
-        account,
-        user: req.user.id,
-    });
-
     try {
+        const resolvedAccount = await resolveWalletId(req.user.id, account);
+        const expense = ExpenseSchema({
+            amount,
+            category,
+            sub_category,
+            description,
+            date,
+            type,
+            account: resolvedAccount,
+            user: req.user.id,
+        });
+
         await expense.save();
         res.status(200).json({message: 'Expense Added'})
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({message: error.message});
+        }
         res.status(500).json({message: 'Server Error'})
     }
 };
@@ -33,18 +38,25 @@ exports.updateExpense = async (req, res) => {
             return res.status(404).json({ message: 'Expense not found' });
         }
 
+        // Re-resolve the wallet: honour an explicit account, otherwise keep the
+        // existing one (falling back to the user's primary if the record has none).
+        const resolvedAccount = await resolveWalletId(req.user.id, account !== undefined ? account : expense.account, {required: false});
+        expense.account = resolvedAccount || expense.account;
+
         expense.amount = amount;
         expense.category = category;
         expense.sub_category = sub_category;
         expense.description = description;
         expense.date = date;
         expense.type = type;
-        if (account !== undefined) expense.account = account;
 
         await expense.save();
 
         res.status(200).json({ message: 'Expense updated successfully' });
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({ message: error.message });
+        }
         res.status(500).json({ message: 'Server Error' });
     }
 };

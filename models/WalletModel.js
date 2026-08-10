@@ -66,6 +66,10 @@ const WalletSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isPrimary: {
+        type: Boolean,
+        default: false,
+    },
 }, {timestamps: true});
 
 module.exports = mongoose.model('Wallet', WalletSchema);

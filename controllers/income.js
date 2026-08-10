@@ -1,17 +1,9 @@
 const IncomeSchema = require("../models/IncomeModel");
+const {resolveWalletId, WalletValidationError} = require('../middlewares/wallet');
 const moment = require('moment');
 
 exports.addIncome = async (req, res) => {
     const {title, amount, category, description, date, account} = req.body;
-    const income = IncomeSchema({
-        title,
-        amount,
-        category,
-        description,
-        date,
-        account,
-        user: req.user.id,
-    });
 
     try {
         if (!category || !date) {
@@ -20,9 +12,23 @@ exports.addIncome = async (req, res) => {
         if (typeof amount !== 'number' || amount <= 0) {
             return res.status(400).json({message: 'Amount must be a positive number.'});
         }
+        const resolvedAccount = await resolveWalletId(req.user.id, account);
+        const income = IncomeSchema({
+            title,
+            amount,
+            category,
+            description,
+            date,
+            account: resolvedAccount,
+            user: req.user.id,
+        });
+
         await income.save();
         res.status(200).json({message: 'Income Added'});
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({message: error.message});
+        }
         res.status(500).json({message: 'Server Error'});
     }
 };
@@ -44,16 +50,23 @@ exports.updateIncome = async (req, res) => {
             return res.status(400).json({message: 'Amount must be a positive number.'});
         }
 
+        // Re-resolve the wallet: honour an explicit account, otherwise keep the
+        // existing one (falling back to the user's primary if the record has none).
+        const resolvedAccount = await resolveWalletId(req.user.id, account !== undefined ? account : income.account, {required: false});
+        income.account = resolvedAccount || income.account;
+
         income.title = title;
         income.amount = amount;
         income.category = category;
         income.description = description;
         income.date = date;
-        if (account !== undefined) income.account = account;
         await income.save();
 
         res.status(200).json({message: 'Income updated successfully'});
     } catch (error) {
+        if (error instanceof WalletValidationError) {
+            return res.status(error.status).json({message: error.message});
+        }
         res.status(500).json({message: 'Server Error'});
     }
 };
