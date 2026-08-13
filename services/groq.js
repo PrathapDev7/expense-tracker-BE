@@ -13,11 +13,14 @@ async function parseFoodText(userInput) {
         role: 'system',
         content: `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutritional values.
 
+CRITICAL: You MUST return ONLY a valid JSON object. NO markdown, NO code blocks, NO explanation text, NO backticks. Just raw JSON.
+
+Return this exact structure:
+{ "items": [ { "originalText": "<exact user phrase>", "foodName": "<canonical name>", "portion": "<quantity with unit>", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number>, "sugar": <number> } ] }
+
 Rules:
 - Extract each distinct food item mentioned
 - Estimate standard serving-size nutrition values (per the quantity specified or per 100g if no quantity given)
-- Return ONLY valid JSON matching this exact structure — no markdown, no explanation text:
-{ "items": [ { "originalText": "<exact user phrase>", "foodName": "<canonical name>", "portion": "<quantity with unit>", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number>, "sugar": <number> } ] }
 - If user didn't specify quantity, estimate for ~1 serving or 100g
 - Be accurate with Indian foods and common foods
 - All nutrition values are estimates rounded to nearest whole number`,
@@ -30,10 +33,17 @@ Rules:
 
   const text = response.choices[0].message.content;
 
-  // Extract JSON from response (may contain markdown code blocks)
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  // Strip markdown code blocks if present
+  let cleanText = text;
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    cleanText = codeBlockMatch[1].trim();
+  }
+
+  // Extract JSON from response
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error(`No JSON found in Groq response: ${text.substring(0, 200)}`);
+    throw new Error(`No JSON found in Groq response: ${cleanText.substring(0, 200)}`);
   }
   const parsed = JSON.parse(jsonMatch[0]);
   return { parsed, rawResponse: text };
