@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function parseFoodText(userInput) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
   const prompt = `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutritional values.
 
@@ -27,7 +27,7 @@ Rules:
 
 async function getLoadingMessage(step) {
   // step: 'starting', 'analyzing', 'calculating', 'finalizing'
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
   const prompts = {
     starting: "Generate ONE short friendly message (under 12 words) telling user you're starting to analyze their food diary entry. Just the message, nothing else.",
