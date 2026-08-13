@@ -16,6 +16,15 @@ const calorieEntrySchema = new mongoose.Schema({
     enum: ['pending', 'inprogress', 'success', 'failed'],
     default: 'pending',
   },
+  foodText: {
+    type: String,
+    trim: true,
+  },
+  // Daily targets
+  calorieTarget: { type: Number, default: 2000 },
+  carbTarget: { type: Number, default: 200 },
+  fatTarget: { type: Number, default: 80 },
+  proteinTarget: { type: Number, default: 100 },
   mealItems: [{
     originalText: { type: String, required: true, trim: true },
     foodName: { type: String, required: true, trim: true },
@@ -26,6 +35,8 @@ const calorieEntrySchema = new mongoose.Schema({
     fat: { type: Number, default: 0 },
     fiber: { type: Number, default: 0 },
     sugar: { type: Number, default: 0 },
+    mealType: { type: String, enum: ['breakfast', 'lunch', 'dinner', 'snack'], default: 'snack' },
+    mealStatus: { type: String, enum: ['completed', 'inProgress', 'pending'], default: 'pending' },
   }],
   dailyTotals: {
     calories: { type: Number, default: 0 },

@@ -51,7 +51,18 @@ exports.getDailyCalories = async (req, res) => {
     const entry = await CalorieEntry.findOne({ user: userId, date: targetDate }).lean();
 
     if (!entry || entry.mealItems.length === 0) {
-      return res.json({ success: true, mealItems: [], dailyTotals: null, status: 'pending' });
+      return res.json({
+        success: true,
+        mealItems: [],
+        dailyTotals: null,
+        status: 'pending',
+        dailyTargets: {
+          calorieTarget: 2000,
+          carbTarget: 200,
+          fatTarget: 80,
+          proteinTarget: 100,
+        },
+      });
     }
 
     res.json({
@@ -60,6 +71,12 @@ exports.getDailyCalories = async (req, res) => {
       mealItems: entry.mealItems,
       dailyTotals: entry.dailyTotals,
       status: entry.status,
+      dailyTargets: {
+        calorieTarget: entry.calorieTarget || 2000,
+        carbTarget: entry.carbTarget || 200,
+        fatTarget: entry.fatTarget || 80,
+        proteinTarget: entry.proteinTarget || 100,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
