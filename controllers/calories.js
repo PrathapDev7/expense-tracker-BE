@@ -62,8 +62,9 @@ exports.processFoodText = async (req, res) => {
 
     res.json({ success: true, mealItems, dailyTotals });
   } catch (err) {
-    console.error('processFoodText error:', err);
-    res.status(500).json({ message: 'Failed to parse food text. Please try again.' });
+    console.error('processFoodText error:', err.message || err);
+    const detail = err.message || 'Unknown error';
+    res.status(500).json({ message: `Failed to parse food text: ${detail}` });
   }
 };
 
