@@ -22,7 +22,11 @@ Rules:
 
   // Extract JSON from response (may contain markdown code blocks)
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch[0]);
+  if (!jsonMatch) {
+    throw new Error(`No JSON found in Gemini response: ${text.substring(0, 200)}`);
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
+  return { parsed, rawResponse: text };
 }
 
 async function getLoadingMessage(step) {

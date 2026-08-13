@@ -30,7 +30,7 @@ exports.processFoodText = async (req, res) => {
   }
 
   try {
-    const parsed = await parseFoodText(text);
+    const { parsed, rawResponse } = await parseFoodText(text);
 
     // Compute daily totals from items
     const mealItems = parsed.items.map(item => ({
@@ -60,7 +60,7 @@ exports.processFoodText = async (req, res) => {
       dailyTotals,
     });
 
-    res.json({ success: true, mealItems, dailyTotals });
+    res.json({ success: true, mealItems, dailyTotals, rawResponse });
   } catch (err) {
     console.error('processFoodText error:', err.message || err);
     res.status(500).json({
