@@ -15,6 +15,11 @@ const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
 
+// Health check endpoint (no auth required) — keeps Render dyno warm
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
+});
+
 const authenticateUser = (req, res, next) => {
     // Get the token from the request headers
     const authHeader = req.header('Authorization');
