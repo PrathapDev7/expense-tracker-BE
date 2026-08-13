@@ -3,11 +3,7 @@ const moment = require('moment');
 const { parseFoodText, getLoadingMessage } = require('../services/gemini');
 
 exports.addCalories = async (req, res) => {
-  const { text, date } = req.body;
-
-  if (!text || !text.trim()) {
-    return res.status(400).json({ message: 'Please enter what you ate.' });
-  }
+  const { date } = req.body;
 
   const userId = req.user.id;
   const targetDate = date || moment().format('YYYY-MM-DD');
