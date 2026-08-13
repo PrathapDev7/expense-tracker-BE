@@ -70,15 +70,28 @@ async function getLoadingMessage(step) {
   return response.choices[0].message.content.trim();
 }
 
+// Buckets a new meal submission into breakfast/lunch/dinner by time of day.
+// `localHour` (0-23), when supplied by the client, reflects the user's own
+// timezone — the server's clock (often UTC) would otherwise misclassify meals.
+function currentMealType(localHour) {
+  const hour = typeof localHour === 'number' && localHour >= 0 && localHour <= 23
+    ? localHour
+    : new Date().getHours();
+  if (hour < 11) return 'breakfast';
+  if (hour < 16) return 'lunch';
+  return 'dinner';
+}
+
 // Shared processing function — used by both the auth controller and the health retry
-async function processEntry(entryId, text) {
+async function processEntry(entryId, text, localHour) {
   const CalorieEntry = require('../models/CalorieEntryModel');
 
   await CalorieEntry.findByIdAndUpdate(entryId, { foodText: text, status: 'inprogress' });
 
   const { parsed, rawResponse } = await parseFoodText(text);
 
-  const mealItems = parsed.items.map(item => ({
+  const mealType = currentMealType(localHour);
+  const addedItems = parsed.items.map(item => ({
     originalText: item.originalText,
     foodName: item.foodName,
     portion: item.portion,
@@ -88,25 +101,34 @@ async function processEntry(entryId, text) {
     fat: item.fat || 0,
     fiber: item.fiber || 0,
     sugar: item.sugar || 0,
+    mealType,
+    mealStatus: 'completed',
   }));
 
+  const entry = await CalorieEntry.findById(entryId);
+  const existingItems = (entry?.mealItems || []).map(m => m.toObject());
+  const mealItems = [...existingItems, ...addedItems];
+
   const dailyTotals = mealItems.reduce((acc, item) => {
-    acc.calories += item.calories;
-    acc.protein += item.protein;
-    acc.carbs += item.carbs;
-    acc.fat += item.fat;
-    acc.fiber += item.fiber;
-    acc.sugar += item.sugar;
+    acc.calories += item.calories || 0;
+    acc.protein += item.protein || 0;
+    acc.carbs += item.carbs || 0;
+    acc.fat += item.fat || 0;
+    acc.fiber += item.fiber || 0;
+    acc.sugar += item.sugar || 0;
     return acc;
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
 
-  await CalorieEntry.findByIdAndUpdate(entryId, {
+  const updated = await CalorieEntry.findByIdAndUpdate(entryId, {
     mealItems,
     dailyTotals,
     status: 'success',
-  });
+  }, { new: true });
 
-  return { mealItems, dailyTotals, rawResponse };
+  // The newly added items as stored (with generated _ids) so the FE can show a details modal.
+  const savedAddedItems = updated.mealItems.slice(-addedItems.length);
+
+  return { mealItems: updated.mealItems, addedItems: savedAddedItems, dailyTotals, rawResponse };
 }
 
 module.exports = { parseFoodText, getLoadingMessage, processEntry };

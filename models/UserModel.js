@@ -18,6 +18,12 @@ const mongoose = require('mongoose');
         password: {
             type: String,
             required: true
+        },
+        calorieGoals: {
+            calorieTarget: { type: Number, default: 2000 },
+            carbTarget: { type: Number, default: 200 },
+            fatTarget: { type: Number, default: 80 },
+            proteinTarget: { type: Number, default: 100 },
         }
     }, {timestamps: true});
 
