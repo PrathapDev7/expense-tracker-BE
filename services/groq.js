@@ -11,19 +11,21 @@ async function parseFoodText(userInput) {
     messages: [
       {
         role: 'system',
-        content: `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutritional values.
+        content: `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutrient DENSITY values (per 100g) plus the estimated gram weight of the portion mentioned. Do NOT multiply anything yourself — report the density and the grams separately and a calculator will scale them.
 
 CRITICAL: You MUST return ONLY a valid JSON object. NO markdown, NO code blocks, NO explanation text, NO backticks. Just raw JSON.
 
 Return this exact structure:
-{ "items": [ { "originalText": "<exact user phrase>", "foodName": "<canonical name>", "portion": "<quantity with unit>", "calories": <number>, "protein": <number>, "carbs": <number>, "fat": <number>, "fiber": <number>, "sugar": <number> } ] }
+{ "items": [ { "originalText": "<exact user phrase>", "foodName": "<canonical name>", "portion": "<human-readable quantity, e.g. '1kg' or '2 eggs (~100g)'>", "grams": <total edible weight in grams that this portion represents>, "caloriesPer100g": <number>, "proteinPer100g": <number>, "carbsPer100g": <number>, "fatPer100g": <number>, "fiberPer100g": <number>, "sugarPer100g": <number> } ] }
 
 Rules:
 - Extract each distinct food item mentioned
-- Estimate standard serving-size nutrition values (per the quantity specified or per 100g if no quantity given)
-- If user didn't specify quantity, estimate for ~1 serving or 100g
+- "grams" is the TOTAL weight of what the user said (e.g. "1kg watermelon" -> grams: 1000, NOT 100). Convert units like kg, cups, pieces, servings to grams using standard reference weights.
+- If the user didn't specify a quantity, assume grams: 100 (one 100g reference serving)
+- caloriesPer100g/proteinPer100g/etc. are always per-100g NUTRIENT DENSITY values for that food — they must stay the same regardless of how much the user ate. Never scale them by the portion size yourself.
 - Be accurate with Indian foods and common foods
-- All nutrition values are estimates rounded to nearest whole number`,
+- Example: input "1kg watermelon" -> watermelon is ~30 kcal per 100g, so: { "foodName": "Watermelon", "portion": "1kg", "grams": 1000, "caloriesPer100g": 30, "proteinPer100g": 0.6, "carbsPer100g": 8, "fatPer100g": 0.2, "fiberPer100g": 0.4, "sugarPer100g": 6 }
+- All density values are estimates rounded to 1 decimal place`,
       },
       { role: 'user', content: userInput },
     ],
@@ -46,6 +48,26 @@ Rules:
     throw new Error(`No JSON found in Groq response: ${cleanText.substring(0, 200)}`);
   }
   const parsed = JSON.parse(jsonMatch[0]);
+
+  // Scale per-100g nutrient density by the reported gram weight ourselves —
+  // small models are unreliable at doing this multiplication inline, and
+  // tend to just echo the per-100g figure as if it were the portion total.
+  const scale = (per100g, grams) => Math.round(((per100g || 0) * grams) / 100);
+  parsed.items = (parsed.items || []).map(item => {
+    const grams = item.grams > 0 ? item.grams : 100;
+    return {
+      originalText: item.originalText,
+      foodName: item.foodName,
+      portion: item.portion,
+      calories: scale(item.caloriesPer100g, grams),
+      protein: scale(item.proteinPer100g, grams),
+      carbs: scale(item.carbsPer100g, grams),
+      fat: scale(item.fatPer100g, grams),
+      fiber: scale(item.fiberPer100g, grams),
+      sugar: scale(item.sugarPer100g, grams),
+    };
+  });
+
   return { parsed, rawResponse: text };
 }
 
