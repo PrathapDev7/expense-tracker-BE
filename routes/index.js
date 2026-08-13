@@ -10,6 +10,7 @@ const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
+const {addCalories, processFoodText, getDailyCalories, deleteMealItem} = require('../controllers/calories');
 const jwt = require('jsonwebtoken');
 
 const router = require('express').Router();
@@ -75,6 +76,10 @@ router.post('/add-income', authenticateUser, addIncome)
     .post('/update-password',authenticateUser, updatePassword)
     .post('/update-profile',authenticateUser, updateProfile)
     .post('/upload-image', authenticateUser, uploadImageMiddleware, uploadImage)
+    .post('/add-calories', authenticateUser, addCalories)
+    .post('/process-food-text', authenticateUser, processFoodText)
+    .get('/get-daily-calories', authenticateUser, getDailyCalories)
+    .delete('/delete-meal-item/:itemId', authenticateUser, deleteMealItem)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
