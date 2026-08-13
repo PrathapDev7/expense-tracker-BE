@@ -71,6 +71,84 @@ Rules:
   return { parsed, rawResponse: text };
 }
 
+const ACTIVITY_LABELS = {
+  sedentary: 'sedentary (little to no exercise)',
+  light: 'lightly active (light exercise 1-3 days/week)',
+  moderate: 'moderately active (moderate exercise 3-5 days/week)',
+  active: 'active (hard exercise 6-7 days/week)',
+  very_active: 'very active (athlete / physical job)',
+};
+
+const GOAL_LABELS = {
+  lose: 'lose weight (moderate calorie deficit)',
+  maintain: 'maintain current weight',
+  gain: 'gain weight / build muscle (lean calorie surplus)',
+};
+
+// Derives daily nutrition targets from a person's stats. Delegates the
+// arithmetic to the LLM but pins it to the standard Mifflin-St Jeor +
+// activity-multiplier method so results stay consistent and explainable.
+async function calculateCalorieGoals({ age, gender, heightCm, weightKg, activityLevel, goal }) {
+  const response = await client.chat.completions.create({
+    model: 'llama-3.1-8b-instant',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a certified nutrition coach calculating daily nutrition targets for a client.
+
+Method — follow these steps exactly:
+1. BMR via Mifflin-St Jeor:
+   - Male: BMR = 10*weightKg + 6.25*heightCm - 5*age + 5
+   - Female: BMR = 10*weightKg + 6.25*heightCm - 5*age - 161
+   - Other: average of the male and female formulas
+2. TDEE = BMR * activity multiplier (sedentary=1.2, light=1.375, moderate=1.55, active=1.725, very_active=1.9)
+3. calorieTarget: TDEE adjusted for goal (lose: TDEE-500, maintain: TDEE, gain: TDEE+350), minimum 1200
+4. proteinTarget (g) = 1.6 * weightKg
+5. fatTarget (g) = 25% of calorieTarget / 9
+6. carbTarget (g) = remaining calories after protein+fat / 4
+7. sugarTarget (g) = 10% of calorieTarget / 4, capped at 50
+
+CRITICAL: Return ONLY a valid JSON object. NO markdown, NO code blocks, NO explanation text.
+Return this exact structure:
+{ "calorieTarget": <int>, "proteinTarget": <int>, "fatTarget": <int>, "carbTarget": <int>, "sugarTarget": <int> }`,
+      },
+      {
+        role: 'user',
+        content: `Age: ${age}, Gender: ${gender}, Height: ${heightCm}cm, Weight: ${weightKg}kg, Activity level: ${ACTIVITY_LABELS[activityLevel] || activityLevel}, Goal: ${GOAL_LABELS[goal] || goal}`,
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 200,
+  });
+
+  const text = response.choices[0].message.content;
+
+  let cleanText = text;
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    cleanText = codeBlockMatch[1].trim();
+  }
+
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error(`No JSON found in Groq response: ${cleanText.substring(0, 200)}`);
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
+
+  const clamp = (value, fallback, min = 0) => {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) && n >= min ? n : fallback;
+  };
+
+  return {
+    calorieTarget: clamp(parsed.calorieTarget, 2000, 1200),
+    proteinTarget: clamp(parsed.proteinTarget, 100),
+    fatTarget: clamp(parsed.fatTarget, 80),
+    carbTarget: clamp(parsed.carbTarget, 200),
+    sugarTarget: clamp(parsed.sugarTarget, 50),
+  };
+}
+
 async function getLoadingMessage(step) {
   const prompts = {
     starting: "Generate ONE short friendly message (under 12 words) telling user you're starting to analyze their food diary entry. Just the message, nothing else.",
@@ -153,4 +231,4 @@ async function processEntry(entryId, text, localHour) {
   return { mealItems: updated.mealItems, addedItems: savedAddedItems, dailyTotals, rawResponse };
 }
 
-module.exports = { parseFoodText, getLoadingMessage, processEntry };
+module.exports = { parseFoodText, getLoadingMessage, processEntry, calculateCalorieGoals };

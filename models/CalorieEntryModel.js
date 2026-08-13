@@ -25,6 +25,7 @@ const calorieEntrySchema = new mongoose.Schema({
   carbTarget: { type: Number, default: 200 },
   fatTarget: { type: Number, default: 80 },
   proteinTarget: { type: Number, default: 100 },
+  sugarTarget: { type: Number, default: 50 },
   mealItems: [{
     originalText: { type: String, required: true, trim: true },
     foodName: { type: String, required: true, trim: true },

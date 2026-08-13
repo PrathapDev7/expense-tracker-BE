@@ -1,9 +1,9 @@
 const CalorieEntry = require('../models/CalorieEntryModel');
 const User = require('../models/UserModel');
 const moment = require('moment');
-const { processEntry } = require('../services/groq');
+const { processEntry, calculateCalorieGoals } = require('../services/groq');
 
-const DEFAULT_GOALS = { calorieTarget: 2000, carbTarget: 200, fatTarget: 80, proteinTarget: 100 };
+const DEFAULT_GOALS = { calorieTarget: 2000, carbTarget: 200, fatTarget: 80, proteinTarget: 100, sugarTarget: 50 };
 
 exports.addCalories = async (req, res) => {
   const { date } = req.body;
@@ -24,6 +24,7 @@ exports.addCalories = async (req, res) => {
           carbTarget: goals.carbTarget ?? DEFAULT_GOALS.carbTarget,
           fatTarget: goals.fatTarget ?? DEFAULT_GOALS.fatTarget,
           proteinTarget: goals.proteinTarget ?? DEFAULT_GOALS.proteinTarget,
+          sugarTarget: goals.sugarTarget ?? DEFAULT_GOALS.sugarTarget,
         },
       },
       { upsert: true, new: true }
@@ -57,7 +58,7 @@ exports.processFoodText = async (req, res) => {
 };
 
 exports.updateCalorieGoals = async (req, res) => {
-  const { calorieTarget, carbTarget, fatTarget, proteinTarget, date } = req.body;
+  const { calorieTarget, carbTarget, fatTarget, proteinTarget, sugarTarget, date } = req.body;
   const userId = req.user.id;
 
   const goals = {};
@@ -65,6 +66,7 @@ exports.updateCalorieGoals = async (req, res) => {
   if (carbTarget != null) goals.carbTarget = carbTarget;
   if (fatTarget != null) goals.fatTarget = fatTarget;
   if (proteinTarget != null) goals.proteinTarget = proteinTarget;
+  if (sugarTarget != null) goals.sugarTarget = sugarTarget;
 
   if (Object.keys(goals).length === 0) {
     return res.status(400).json({ message: 'No goal fields provided.' });
@@ -96,6 +98,7 @@ exports.getDailyCalories = async (req, res) => {
     const entry = await CalorieEntry.findOne({ user: userId, date: targetDate }).lean();
     const user = await User.findById(userId).lean();
     const goals = user?.calorieGoals || DEFAULT_GOALS;
+    const healthProfile = user?.healthProfile || null;
 
     if (!entry || entry.mealItems.length === 0) {
       return res.json({
@@ -108,7 +111,9 @@ exports.getDailyCalories = async (req, res) => {
           carbTarget: goals.carbTarget ?? DEFAULT_GOALS.carbTarget,
           fatTarget: goals.fatTarget ?? DEFAULT_GOALS.fatTarget,
           proteinTarget: goals.proteinTarget ?? DEFAULT_GOALS.proteinTarget,
+          sugarTarget: goals.sugarTarget ?? DEFAULT_GOALS.sugarTarget,
         },
+        healthProfile,
       });
     }
 
@@ -123,10 +128,39 @@ exports.getDailyCalories = async (req, res) => {
         carbTarget: entry.carbTarget ?? goals.carbTarget ?? DEFAULT_GOALS.carbTarget,
         fatTarget: entry.fatTarget ?? goals.fatTarget ?? DEFAULT_GOALS.fatTarget,
         proteinTarget: entry.proteinTarget ?? goals.proteinTarget ?? DEFAULT_GOALS.proteinTarget,
+        sugarTarget: entry.sugarTarget ?? goals.sugarTarget ?? DEFAULT_GOALS.sugarTarget,
       },
+      healthProfile,
     });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.calculateGoals = async (req, res) => {
+  const { age, gender, heightCm, weightKg, activityLevel, goal } = req.body;
+  const userId = req.user.id;
+
+  if (!age || !gender || !heightCm || !weightKg) {
+    return res.status(400).json({ message: 'age, gender, heightCm and weightKg are required.' });
+  }
+
+  const healthProfile = {
+    age,
+    gender,
+    heightCm,
+    weightKg,
+    activityLevel: activityLevel || 'moderate',
+    goal: goal || 'maintain',
+  };
+
+  try {
+    await User.findByIdAndUpdate(userId, { $set: { healthProfile } });
+    const calorieGoals = await calculateCalorieGoals(healthProfile);
+    res.json({ success: true, calorieGoals, healthProfile });
+  } catch (err) {
+    console.error('calculateGoals error:', err.message || err);
+    res.status(500).json({ message: `Failed to calculate goals: ${err.message || 'Unknown error'}` });
   }
 };
 

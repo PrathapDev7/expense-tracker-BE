@@ -10,7 +10,7 @@ const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
-const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals} = require('../controllers/calories');
+const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals} = require('../controllers/calories');
 const CalorieEntry = require('../models/CalorieEntryModel');
 const { processEntry } = require('../services/groq');
 const jwt = require('jsonwebtoken');
@@ -111,6 +111,7 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-daily-calories', authenticateUser, getDailyCalories)
     .delete('/delete-meal-item/:itemId', authenticateUser, deleteMealItem)
     .put('/update-calorie-goals', authenticateUser, updateCalorieGoals)
+    .post('/calculate-calorie-goals', authenticateUser, calculateGoals)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
