@@ -11,12 +11,37 @@ const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem} = require('../controllers/calories');
+const CalorieEntry = require('../models/CalorieEntryModel');
+const { processEntry } = require('../services/groq');
 const jwt = require('jsonwebtoken');
+const moment = require('moment');
 
 const router = require('express').Router();
 
-// Health check endpoint (no auth required) — keeps Render dyno warm
-router.get('/health', (req, res) => {
+// Health check endpoint (no auth required) — keeps Render dyno warm + retries failed entries
+router.get('/health', async (req, res) => {
+  // Fire-and-forget retry of failed/pending entries (don't await)
+  (async () => {
+    try {
+      const fiveMinAgo = moment().subtract(5, 'minutes').toISOString();
+      const failed = await CalorieEntry.find({
+        status: { $in: ['failed', 'pending'] },
+        updatedAt: { $lt: fiveMinAgo },
+      }).lean();
+
+      for (const entry of failed) {
+        if (entry.foodText) {
+          console.log(`[retry] Processing failed entry ${entry._id}: "${entry.foodText.substring(0, 50)}..."`);
+          processEntry(entry._id, entry.foodText).catch(err => {
+            console.error(`[retry] Failed to retry entry ${entry._id}:`, err.message);
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[retry] Error scanning for failed entries:', err.message);
+    }
+  })();
+
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 

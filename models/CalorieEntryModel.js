@@ -11,6 +11,11 @@ const calorieEntrySchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  status: {
+    type: String,
+    enum: ['pending', 'inprogress', 'success', 'failed'],
+    default: 'pending',
+  },
   mealItems: [{
     originalText: { type: String, required: true, trim: true },
     foodName: { type: String, required: true, trim: true },

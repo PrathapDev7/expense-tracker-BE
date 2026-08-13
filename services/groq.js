@@ -70,4 +70,43 @@ async function getLoadingMessage(step) {
   return response.choices[0].message.content.trim();
 }
 
-module.exports = { parseFoodText, getLoadingMessage };
+// Shared processing function — used by both the auth controller and the health retry
+async function processEntry(entryId, text) {
+  const CalorieEntry = require('../models/CalorieEntryModel');
+
+  await CalorieEntry.findByIdAndUpdate(entryId, { foodText: text, status: 'inprogress' });
+
+  const { parsed, rawResponse } = await parseFoodText(text);
+
+  const mealItems = parsed.items.map(item => ({
+    originalText: item.originalText,
+    foodName: item.foodName,
+    portion: item.portion,
+    calories: item.calories || 0,
+    protein: item.protein || 0,
+    carbs: item.carbs || 0,
+    fat: item.fat || 0,
+    fiber: item.fiber || 0,
+    sugar: item.sugar || 0,
+  }));
+
+  const dailyTotals = mealItems.reduce((acc, item) => {
+    acc.calories += item.calories;
+    acc.protein += item.protein;
+    acc.carbs += item.carbs;
+    acc.fat += item.fat;
+    acc.fiber += item.fiber;
+    acc.sugar += item.sugar;
+    return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
+
+  await CalorieEntry.findByIdAndUpdate(entryId, {
+    mealItems,
+    dailyTotals,
+    status: 'success',
+  });
+
+  return { mealItems, dailyTotals, rawResponse };
+}
+
+module.exports = { parseFoodText, getLoadingMessage, processEntry };

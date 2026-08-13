@@ -1,6 +1,6 @@
 const CalorieEntry = require('../models/CalorieEntryModel');
 const moment = require('moment');
-const { parseFoodText, getLoadingMessage } = require('../services/groq');
+const { processEntry } = require('../services/groq');
 
 exports.addCalories = async (req, res) => {
   const { date } = req.body;
@@ -9,14 +9,13 @@ exports.addCalories = async (req, res) => {
   const targetDate = date || moment().format('YYYY-MM-DD');
 
   try {
-    // Use upsert: one entry per user per day
     const updated = await CalorieEntry.findOneAndUpdate(
       { user: userId, date: targetDate },
-      { $set: { user: userId, date: targetDate } },
+      { $set: { user: userId, date: targetDate, status: 'pending' } },
       { upsert: true, new: true }
     );
 
-    res.json({ success: true, entryId: updated._id });
+    res.json({ success: true, entryId: updated._id, status: updated.status });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }
@@ -30,42 +29,15 @@ exports.processFoodText = async (req, res) => {
   }
 
   try {
-    const { parsed, rawResponse } = await parseFoodText(text);
-
-    // Compute daily totals from items
-    const mealItems = parsed.items.map(item => ({
-      originalText: item.originalText,
-      foodName: item.foodName,
-      portion: item.portion,
-      calories: item.calories || 0,
-      protein: item.protein || 0,
-      carbs: item.carbs || 0,
-      fat: item.fat || 0,
-      fiber: item.fiber || 0,
-      sugar: item.sugar || 0,
-    }));
-
-    const dailyTotals = mealItems.reduce((acc, item) => {
-      acc.calories += item.calories;
-      acc.protein += item.protein;
-      acc.carbs += item.carbs;
-      acc.fat += item.fat;
-      acc.fiber += item.fiber;
-      acc.sugar += item.sugar;
-      return acc;
-    }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 });
-
-    await CalorieEntry.findByIdAndUpdate(entryId, {
-      mealItems,
-      dailyTotals,
-    });
-
-    res.json({ success: true, mealItems, dailyTotals, rawResponse });
+    const result = await processEntry(entryId, text);
+    res.json({ success: true, ...result, status: 'success' });
   } catch (err) {
     console.error('processFoodText error:', err.message || err);
+    await CalorieEntry.findByIdAndUpdate(entryId, { status: 'failed' });
     res.status(500).json({
       message: `Failed to parse food text: ${err.message || 'Unknown error'}`,
       rawResponse: err.message || null,
+      status: 'failed',
     });
   }
 };
@@ -79,7 +51,7 @@ exports.getDailyCalories = async (req, res) => {
     const entry = await CalorieEntry.findOne({ user: userId, date: targetDate }).lean();
 
     if (!entry || entry.mealItems.length === 0) {
-      return res.json({ success: true, mealItems: [], dailyTotals: null });
+      return res.json({ success: true, mealItems: [], dailyTotals: null, status: 'pending' });
     }
 
     res.json({
@@ -87,6 +59,7 @@ exports.getDailyCalories = async (req, res) => {
       date: entry.date,
       mealItems: entry.mealItems,
       dailyTotals: entry.dailyTotals,
+      status: entry.status,
     });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
@@ -106,7 +79,6 @@ exports.deleteMealItem = async (req, res) => {
 
     entry.mealItems.splice(itemIndex, 1);
 
-    // Recompute daily totals
     entry.dailyTotals = entry.mealItems.reduce((acc, item) => {
       acc.calories += item.calories || 0;
       acc.protein += item.protein || 0;
