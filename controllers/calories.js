@@ -1,6 +1,6 @@
 const CalorieEntry = require('../models/CalorieEntryModel');
 const moment = require('moment');
-const { parseFoodText, getLoadingMessage } = require('../services/gemini');
+const { parseFoodText, getLoadingMessage } = require('../services/groq');
 
 exports.addCalories = async (req, res) => {
   const { date } = req.body;
