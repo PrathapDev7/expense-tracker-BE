@@ -1,6 +1,6 @@
 const CalorieEntry = require('../models/CalorieEntryModel');
 const WeightEntry = require('../models/WeightEntryModel');
-const User = require('../models/UserModel');
+const HealthProfile = require('../models/HealthProfileModel');
 const moment = require('moment');
 const { processEntry, calculateCalorieGoals } = require('../services/groq');
 
@@ -13,8 +13,8 @@ exports.addCalories = async (req, res) => {
   const targetDate = date || moment().format('YYYY-MM-DD');
 
   try {
-    const user = await User.findById(userId).lean();
-    const goals = user?.calorieGoals || DEFAULT_GOALS;
+    const profile = await HealthProfile.findOne({ user: userId }).lean();
+    const goals = profile?.calorieGoals || DEFAULT_GOALS;
 
     const updated = await CalorieEntry.findOneAndUpdate(
       { user: userId, date: targetDate },
@@ -48,12 +48,14 @@ exports.processFoodText = async (req, res) => {
     const result = await processEntry(entryId, text, localHour);
     res.json({ success: true, ...result, status: 'success' });
   } catch (err) {
+    // processEntry already recorded a pending placeholder + 'failed' status for
+    // /health to retry — never surface this as an error to the user.
     console.error('processFoodText error:', err.message || err);
-    await CalorieEntry.findByIdAndUpdate(entryId, { status: 'failed' });
-    res.status(500).json({
-      message: `Failed to parse food text: ${err.message || 'Unknown error'}`,
-      rawResponse: err.message || null,
-      status: 'failed',
+    res.json({
+      success: true,
+      status: 'pending',
+      addedItems: [],
+      message: 'We had trouble analyzing that just now — nutrition data will be added shortly.',
     });
   }
 };
@@ -74,17 +76,17 @@ exports.updateCalorieGoals = async (req, res) => {
   }
 
   try {
-    const user = await User.findByIdAndUpdate(
-      userId,
+    const profile = await HealthProfile.findOneAndUpdate(
+      { user: userId },
       { $set: Object.fromEntries(Object.entries(goals).map(([k, v]) => [`calorieGoals.${k}`, v])) },
-      { new: true }
+      { new: true, upsert: true }
     ).lean();
 
     // Keep the current day's entry in sync so the UI reflects the change immediately.
     const targetDate = date || moment().format('YYYY-MM-DD');
     await CalorieEntry.findOneAndUpdate({ user: userId, date: targetDate }, { $set: goals });
 
-    res.json({ success: true, calorieGoals: user.calorieGoals });
+    res.json({ success: true, calorieGoals: profile.calorieGoals });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }
@@ -97,9 +99,9 @@ exports.getDailyCalories = async (req, res) => {
 
   try {
     const entry = await CalorieEntry.findOne({ user: userId, date: targetDate }).lean();
-    const user = await User.findById(userId).lean();
-    const goals = user?.calorieGoals || DEFAULT_GOALS;
-    const healthProfile = user?.healthProfile || null;
+    const profile = await HealthProfile.findOne({ user: userId }).lean();
+    const goals = profile?.calorieGoals || DEFAULT_GOALS;
+    const healthProfile = profile?.healthProfile || null;
 
     if (!entry || entry.mealItems.length === 0) {
       return res.json({
@@ -156,7 +158,11 @@ exports.calculateGoals = async (req, res) => {
   };
 
   try {
-    await User.findByIdAndUpdate(userId, { $set: { healthProfile } });
+    await HealthProfile.findOneAndUpdate(
+      { user: userId },
+      { $set: { healthProfile } },
+      { upsert: true }
+    );
     const calorieGoals = await calculateCalorieGoals(healthProfile);
     res.json({ success: true, calorieGoals, healthProfile });
   } catch (err) {
@@ -227,15 +233,15 @@ exports.getWeightHistory = async (req, res) => {
     })
       .sort({ date: 1 })
       .lean();
-    const user = await User.findById(userId).lean();
+    const profile = await HealthProfile.findOne({ user: userId }).lean();
 
     res.json({
       success: true,
       from,
       to,
       entries,
-      targetWeightKg: user?.healthProfile?.targetWeightKg ?? null,
-      currentWeightKg: user?.healthProfile?.weightKg ?? null,
+      targetWeightKg: profile?.healthProfile?.targetWeightKg ?? null,
+      currentWeightKg: profile?.healthProfile?.weightKg ?? null,
     });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
@@ -264,12 +270,12 @@ exports.updateTargetWeight = async (req, res) => {
   }
 
   try {
-    const user = await User.findByIdAndUpdate(
-      userId,
+    const profile = await HealthProfile.findOneAndUpdate(
+      { user: userId },
       { $set: { 'healthProfile.targetWeightKg': targetWeightKg } },
-      { new: true }
+      { new: true, upsert: true }
     ).lean();
-    res.json({ success: true, targetWeightKg: user.healthProfile?.targetWeightKg ?? null });
+    res.json({ success: true, targetWeightKg: profile.healthProfile?.targetWeightKg ?? null });
   } catch (err) {
     res.status(500).json({ message: 'Server Error' });
   }
