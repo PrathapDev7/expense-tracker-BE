@@ -5,13 +5,16 @@ const client = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1',
 });
 
-async function parseFoodText(userInput) {
-  const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutrient DENSITY values (per 100g) plus the estimated gram weight of the portion mentioned. Do NOT multiply anything yourself — report the density and the grams separately and a calculator will scale them.
+// Tried in order — most accurate first, falling back to faster/smaller models
+// only when an earlier one errors out (rate limit, timeout, bad JSON, etc).
+const MODELS = [
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+];
+
+const FOOD_PARSE_SYSTEM_PROMPT = `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutrient DENSITY values (per 100g) plus the estimated gram weight of the portion mentioned. Do NOT multiply anything yourself — report the density and the grams separately and a calculator will scale them.
 
 CRITICAL: You MUST return ONLY a valid JSON object. NO markdown, NO code blocks, NO explanation text, NO backticks. Just raw JSON.
 
@@ -25,50 +28,66 @@ Rules:
 - caloriesPer100g/proteinPer100g/etc. are always per-100g NUTRIENT DENSITY values for that food — they must stay the same regardless of how much the user ate. Never scale them by the portion size yourself.
 - Be accurate with Indian foods and common foods
 - Example: input "1kg watermelon" -> watermelon is ~30 kcal per 100g, so: { "foodName": "Watermelon", "portion": "1kg", "grams": 1000, "caloriesPer100g": 30, "proteinPer100g": 0.6, "carbsPer100g": 8, "fatPer100g": 0.2, "fiberPer100g": 0.4, "sugarPer100g": 6 }
-- All density values are estimates rounded to 1 decimal place`,
-      },
-      { role: 'user', content: userInput },
-    ],
-    temperature: 0.3,
-    max_tokens: 2000,
-  });
+- All density values are estimates rounded to 1 decimal place`;
 
-  const text = response.choices[0].message.content;
+async function parseFoodText(userInput) {
+  let lastError;
 
-  // Strip markdown code blocks if present
-  let cleanText = text;
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    cleanText = codeBlockMatch[1].trim();
+  for (const model of MODELS) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: FOOD_PARSE_SYSTEM_PROMPT },
+          { role: 'user', content: userInput },
+        ],
+        temperature: 0.3,
+        max_tokens: 2000,
+      });
+
+      const text = response.choices[0].message.content;
+
+      // Strip markdown code blocks if present
+      let cleanText = text;
+      const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleanText = codeBlockMatch[1].trim();
+      }
+
+      // Extract JSON from response
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error(`No JSON found in response: ${cleanText.substring(0, 200)}`);
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Scale per-100g nutrient density by the reported gram weight ourselves —
+      // small models are unreliable at doing this multiplication inline, and
+      // tend to just echo the per-100g figure as if it were the portion total.
+      const scale = (per100g, grams) => Math.round(((per100g || 0) * grams) / 100);
+      parsed.items = (parsed.items || []).map(item => {
+        const grams = item.grams > 0 ? item.grams : 100;
+        return {
+          originalText: item.originalText,
+          foodName: item.foodName,
+          portion: item.portion,
+          calories: scale(item.caloriesPer100g, grams),
+          protein: scale(item.proteinPer100g, grams),
+          carbs: scale(item.carbsPer100g, grams),
+          fat: scale(item.fatPer100g, grams),
+          fiber: scale(item.fiberPer100g, grams),
+          sugar: scale(item.sugarPer100g, grams),
+        };
+      });
+
+      return { parsed, rawResponse: text };
+    } catch (err) {
+      console.error(`[groq] model "${model}" failed: ${err.message || err}`);
+      lastError = err;
+    }
   }
 
-  // Extract JSON from response
-  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error(`No JSON found in Groq response: ${cleanText.substring(0, 200)}`);
-  }
-  const parsed = JSON.parse(jsonMatch[0]);
-
-  // Scale per-100g nutrient density by the reported gram weight ourselves —
-  // small models are unreliable at doing this multiplication inline, and
-  // tend to just echo the per-100g figure as if it were the portion total.
-  const scale = (per100g, grams) => Math.round(((per100g || 0) * grams) / 100);
-  parsed.items = (parsed.items || []).map(item => {
-    const grams = item.grams > 0 ? item.grams : 100;
-    return {
-      originalText: item.originalText,
-      foodName: item.foodName,
-      portion: item.portion,
-      calories: scale(item.caloriesPer100g, grams),
-      protein: scale(item.proteinPer100g, grams),
-      carbs: scale(item.carbsPer100g, grams),
-      fat: scale(item.fatPer100g, grams),
-      fiber: scale(item.fiberPer100g, grams),
-      sugar: scale(item.sugarPer100g, grams),
-    };
-  });
-
-  return { parsed, rawResponse: text };
+  throw lastError;
 }
 
 const ACTIVITY_MULTIPLIERS = {
@@ -150,9 +169,36 @@ async function processEntry(entryId, text, localHour) {
 
   await CalorieEntry.findByIdAndUpdate(entryId, { foodText: text, status: 'inprogress' });
 
-  const { parsed, rawResponse } = await parseFoodText(text);
-
   const mealType = currentMealType(localHour);
+
+  let parsed, rawResponse;
+  try {
+    ({ parsed, rawResponse } = await parseFoodText(text));
+  } catch (err) {
+    // Every model in the fallback chain failed. Leave a visible placeholder
+    // (mealStatus 'pending') instead of surfacing an error — the /health route
+    // will pick this entry back up (status 'failed') and retry it later.
+    const entry = await CalorieEntry.findById(entryId);
+    const existingItems = (entry?.mealItems || []).map(m => m.toObject());
+    const hasPlaceholder = existingItems.some(m => m.mealStatus === 'pending' && m.originalText === text);
+    const mealItems = hasPlaceholder
+      ? existingItems
+      : [...existingItems, {
+          originalText: text,
+          foodName: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          sugar: 0,
+          mealType,
+          mealStatus: 'pending',
+        }];
+    await CalorieEntry.findByIdAndUpdate(entryId, { mealItems, status: 'failed' });
+    throw err;
+  }
+
   const addedItems = parsed.items.map(item => ({
     originalText: item.originalText,
     foodName: item.foodName,
@@ -168,7 +214,11 @@ async function processEntry(entryId, text, localHour) {
   }));
 
   const entry = await CalorieEntry.findById(entryId);
-  const existingItems = (entry?.mealItems || []).map(m => m.toObject());
+  // Drop the pending placeholder this text created earlier, if any, so a
+  // successful retry replaces it instead of leaving a duplicate stale row.
+  const existingItems = (entry?.mealItems || [])
+    .map(m => m.toObject())
+    .filter(m => !(m.mealStatus === 'pending' && m.originalText === text));
   const mealItems = [...existingItems, ...addedItems];
 
   const dailyTotals = mealItems.reduce((acc, item) => {
