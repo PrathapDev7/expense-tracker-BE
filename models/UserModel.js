@@ -41,6 +41,7 @@ const mongoose = require('mongoose');
                 enum: ['lose', 'maintain', 'gain'],
                 default: 'maintain',
             },
+            targetWeightKg: { type: Number },
         },
     }, {timestamps: true});
 

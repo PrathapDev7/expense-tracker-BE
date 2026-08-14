@@ -1,4 +1,5 @@
 const CalorieEntry = require('../models/CalorieEntryModel');
+const WeightEntry = require('../models/WeightEntryModel');
 const User = require('../models/UserModel');
 const moment = require('moment');
 const { processEntry, calculateCalorieGoals } = require('../services/groq');
@@ -161,6 +162,116 @@ exports.calculateGoals = async (req, res) => {
   } catch (err) {
     console.error('calculateGoals error:', err.message || err);
     res.status(500).json({ message: `Failed to calculate goals: ${err.message || 'Unknown error'}` });
+  }
+};
+
+exports.getCalorieHistory = async (req, res) => {
+  const userId = req.user.id;
+  const to = req.query.to || moment().format('YYYY-MM-DD');
+  const from = req.query.from || moment(to).subtract(6, 'days').format('YYYY-MM-DD');
+
+  try {
+    const entries = await CalorieEntry.find({
+      user: userId,
+      date: { $gte: from, $lte: to },
+    })
+      .sort({ date: 1 })
+      .lean();
+
+    const days = entries.map(e => ({
+      date: e.date,
+      calories: e.dailyTotals?.calories || 0,
+      protein: e.dailyTotals?.protein || 0,
+      carbs: e.dailyTotals?.carbs || 0,
+      fat: e.dailyTotals?.fat || 0,
+      sugar: e.dailyTotals?.sugar || 0,
+      calorieTarget: e.calorieTarget,
+    }));
+
+    res.json({ success: true, from, to, days });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.addWeightEntry = async (req, res) => {
+  const { weightKg, date } = req.body;
+  const userId = req.user.id;
+  const targetDate = date || moment().format('YYYY-MM-DD');
+
+  if (!weightKg || weightKg <= 0) {
+    return res.status(400).json({ message: 'A valid weightKg is required.' });
+  }
+
+  try {
+    const entry = await WeightEntry.findOneAndUpdate(
+      { user: userId, date: targetDate },
+      { $set: { weightKg } },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, entry });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.getWeightHistory = async (req, res) => {
+  const userId = req.user.id;
+  const to = req.query.to || moment().format('YYYY-MM-DD');
+  const from = req.query.from || moment(to).subtract(89, 'days').format('YYYY-MM-DD');
+
+  try {
+    const entries = await WeightEntry.find({
+      user: userId,
+      date: { $gte: from, $lte: to },
+    })
+      .sort({ date: 1 })
+      .lean();
+    const user = await User.findById(userId).lean();
+
+    res.json({
+      success: true,
+      from,
+      to,
+      entries,
+      targetWeightKg: user?.healthProfile?.targetWeightKg ?? null,
+      currentWeightKg: user?.healthProfile?.weightKg ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.deleteWeightEntry = async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const entry = await WeightEntry.findOneAndDelete({ _id: id, user: userId });
+    if (!entry) return res.status(404).json({ message: 'Entry not found.' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+exports.updateTargetWeight = async (req, res) => {
+  const { targetWeightKg } = req.body;
+  const userId = req.user.id;
+
+  if (!targetWeightKg || targetWeightKg <= 0) {
+    return res.status(400).json({ message: 'A valid targetWeightKg is required.' });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: { 'healthProfile.targetWeightKg': targetWeightKg } },
+      { new: true }
+    ).lean();
+    res.json({ success: true, targetWeightKg: user.healthProfile?.targetWeightKg ?? null });
+  } catch (err) {
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
