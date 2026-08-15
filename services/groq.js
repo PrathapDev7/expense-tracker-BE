@@ -1,18 +1,4 @@
-const OpenAI = require('openai');
-
-const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1',
-});
-
-// Tried in order — most accurate first, falling back to faster/smaller models
-// only when an earlier one errors out (rate limit, timeout, bad JSON, etc).
-const MODELS = [
-  'openai/gpt-oss-120b',
-  'openai/gpt-oss-20b',
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-];
+const { chatCompletionWithFallback } = require('./aiModels');
 
 const FOOD_PARSE_SYSTEM_PROMPT = `You are a nutrition analyzer. Given the user's food description, parse it into individual food items with nutrient DENSITY values (per 100g) plus the estimated gram weight of the portion mentioned. Do NOT multiply anything yourself — report the density and the grams separately and a calculator will scale them.
 
@@ -31,63 +17,49 @@ Rules:
 - All density values are estimates rounded to 1 decimal place`;
 
 async function parseFoodText(userInput) {
-  let lastError;
+  const { text } = await chatCompletionWithFallback({
+    messages: [
+      { role: 'system', content: FOOD_PARSE_SYSTEM_PROMPT },
+      { role: 'user', content: userInput },
+    ],
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
 
-  for (const model of MODELS) {
-    try {
-      const response = await client.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: FOOD_PARSE_SYSTEM_PROMPT },
-          { role: 'user', content: userInput },
-        ],
-        temperature: 0.3,
-        max_tokens: 2000,
-      });
-
-      const text = response.choices[0].message.content;
-
-      // Strip markdown code blocks if present
-      let cleanText = text;
-      const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        cleanText = codeBlockMatch[1].trim();
-      }
-
-      // Extract JSON from response
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error(`No JSON found in response: ${cleanText.substring(0, 200)}`);
-      }
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      // Scale per-100g nutrient density by the reported gram weight ourselves —
-      // small models are unreliable at doing this multiplication inline, and
-      // tend to just echo the per-100g figure as if it were the portion total.
-      const scale = (per100g, grams) => Math.round(((per100g || 0) * grams) / 100);
-      parsed.items = (parsed.items || []).map(item => {
-        const grams = item.grams > 0 ? item.grams : 100;
-        return {
-          originalText: item.originalText,
-          foodName: item.foodName,
-          portion: item.portion,
-          calories: scale(item.caloriesPer100g, grams),
-          protein: scale(item.proteinPer100g, grams),
-          carbs: scale(item.carbsPer100g, grams),
-          fat: scale(item.fatPer100g, grams),
-          fiber: scale(item.fiberPer100g, grams),
-          sugar: scale(item.sugarPer100g, grams),
-        };
-      });
-
-      return { parsed, rawResponse: text };
-    } catch (err) {
-      console.error(`[groq] model "${model}" failed: ${err.message || err}`);
-      lastError = err;
-    }
+  // Strip markdown code blocks if present
+  let cleanText = text;
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    cleanText = codeBlockMatch[1].trim();
   }
 
-  throw lastError;
+  // Extract JSON from response
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error(`No JSON found in response: ${cleanText.substring(0, 200)}`);
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
+
+  // Scale per-100g nutrient density by the reported gram weight ourselves —
+  // small models are unreliable at doing this multiplication inline, and
+  // tend to just echo the per-100g figure as if it were the portion total.
+  const scale = (per100g, grams) => Math.round(((per100g || 0) * grams) / 100);
+  parsed.items = (parsed.items || []).map(item => {
+    const grams = item.grams > 0 ? item.grams : 100;
+    return {
+      originalText: item.originalText,
+      foodName: item.foodName,
+      portion: item.portion,
+      calories: scale(item.caloriesPer100g, grams),
+      protein: scale(item.proteinPer100g, grams),
+      carbs: scale(item.carbsPer100g, grams),
+      fat: scale(item.fatPer100g, grams),
+      fiber: scale(item.fiberPer100g, grams),
+      sugar: scale(item.sugarPer100g, grams),
+    };
+  });
+
+  return { parsed, rawResponse: text };
 }
 
 const ACTIVITY_MULTIPLIERS = {
@@ -138,8 +110,7 @@ async function getLoadingMessage(step) {
     finalizing: "Generate ONE short message (under 12 words) about nearly finishing and showing results. Just the message, nothing else."
   };
 
-  const response = await client.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
+  const { text } = await chatCompletionWithFallback({
     messages: [
       { role: 'system', content: 'You generate short loading messages for a food analysis app. Be friendly and encouraging. Under 12 words.' },
       { role: 'user', content: prompts[step] || prompts.starting },
@@ -148,7 +119,7 @@ async function getLoadingMessage(step) {
     max_tokens: 50,
   });
 
-  return response.choices[0].message.content.trim();
+  return text.trim();
 }
 
 // Buckets a new meal submission into breakfast/lunch/dinner by time of day.
