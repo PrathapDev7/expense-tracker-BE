@@ -10,6 +10,7 @@ const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
+const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation} = require('../controllers/exerciseAnimation');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
 const CalorieEntry = require('../models/CalorieEntryModel');
 const { processEntry } = require('../services/groq');
@@ -117,6 +118,10 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-weight-history', authenticateUser, getWeightHistory)
     .delete('/delete-weight-entry/:id', authenticateUser, deleteWeightEntry)
     .put('/update-target-weight', authenticateUser, updateTargetWeight)
+    .get('/get-exercises', authenticateUser, getExercises)
+    .get('/get-exercise-muscles', authenticateUser, getExerciseMuscles)
+    .get('/get-exercise-equipments', authenticateUser, getExerciseEquipments)
+    .get('/get-exercise-animation', authenticateUser, getExerciseAnimation)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
