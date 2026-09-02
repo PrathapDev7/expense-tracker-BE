@@ -31,6 +31,10 @@ const STATE_ID = 'vfe-animations';
 // that a crashed process does not block re-seeding until the next redeploy.
 const STALE_CLAIM_MS = 15 * 60 * 1000;
 
+// How many times boot re-checks after finding the work already claimed. Bounded
+// so a source file that can never be loaded does not re-read 92 MB forever.
+const SEED_RETRY_LIMIT = 3;
+
 const stateCollection = () => mongoose.connection.db.collection(STATE_COLLECTION);
 
 /**
@@ -194,6 +198,13 @@ const isSeeded = async () => {
     const marker = await stateCollection().findOne({_id: STATE_ID});
     if (!marker || !marker.completedAt) return false;
 
+    // A regenerated catalog can swap exercises without moving the row count --
+    // 40 retired, 40 added, still 1603 -- so counting alone would call a stale
+    // collection complete. The source size shifts whenever the catalog really
+    // changes and, unlike mtime, does not churn when the same bytes are fetched
+    // again. A deployed host has no source file; there the count is all there is.
+    if (fs.existsSync(SOURCE_FILE) && marker.sourceSize !== fs.statSync(SOURCE_FILE).size) return false;
+
     const live = await ExerciseAnimationSchema.countDocuments();
     return live > 0 && live === marker.count;
 };
@@ -231,11 +242,39 @@ const seedAnimationsIfNeeded = async () => {
     const stored = await ExerciseAnimationSchema.countDocuments();
     await stateCollection().updateOne(
         {_id: STATE_ID},
-        {$set: {completedAt: new Date(), count: stored, expected: totals.read}},
+        {$set: {completedAt: new Date(), count: stored, expected: totals.read, sourceSize: fs.statSync(SOURCE_FILE).size}},
     );
 
     console.log(`[animations] seeded ${stored} animations (${totals.inserted} new, ${totals.duplicates} already present)`);
     return {...totals, stored};
 };
 
-module.exports = {SOURCE_FILE, seedCatalog, seedAnimationsIfNeeded, isSeeded};
+/**
+ * Boot hook: runs the seed, and re-checks later if it could not run.
+ *
+ * A process that dies mid-seed leaves its claim behind, and boot is the only
+ * trigger -- so the instance that takes over would skip once and then sit on a
+ * half-loaded catalog until somebody restarted it. That is the ordinary path on
+ * a rolling deploy, not the unlucky one. Re-checks are spaced by the stale
+ * window, which is the soonest an abandoned claim can be taken over.
+ */
+const startAnimationSeeder = (attempt = 0) => {
+    seedAnimationsIfNeeded()
+        .then((result) => {
+            const settled = result.stored !== undefined
+                || result.skipped === 'already seeded'
+                || result.skipped === 'source file missing';
+            if (settled) return;
+
+            if (attempt >= SEED_RETRY_LIMIT) {
+                console.warn(`[animations] catalog still incomplete after ${SEED_RETRY_LIMIT} retries -- run "npm run seedAnimations"`);
+                return;
+            }
+
+            // unref so a pending re-check never holds the process open by itself.
+            setTimeout(() => startAnimationSeeder(attempt + 1), STALE_CLAIM_MS).unref();
+        })
+        .catch((error) => console.log('Animation Seed Error', error));
+};
+
+module.exports = {SOURCE_FILE, seedCatalog, seedAnimationsIfNeeded, startAnimationSeeder, isSeeded};
