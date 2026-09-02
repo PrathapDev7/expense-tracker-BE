@@ -48,3 +48,14 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
+
+# Runtime animation cache (fetched on demand, regenerable)
+.cache/
+
+# Minified compositions produced by Seeders/BuildAnimationIndexFromArchive.js
+Seeders/data/vfe_lottie/
+Seeders/data/vfe_animation_index.enriched.json
+
+# Compositions embedded per line by Seeders/FetchVfeLottie.js (~92 MB).
+# Regenerable with "npm run fetchVfeLottie"; the API reads them from Mongo.
+Seeders/data/vfe_animation_index_lottie.json
