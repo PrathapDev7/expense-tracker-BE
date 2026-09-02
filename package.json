@@ -9,6 +9,7 @@
     "fetchExercises": "node Seeders/FetchExerciseCatalog.js",
     "fetchAnimations": "node Seeders/FetchAnimations.js",
     "seedAnimations": "node Seeders/SeedExerciseAnimations.js",
+    "seedExerciseMetadata": "node Seeders/SeedExerciseMetadata.js",
     "packAnimations": "node Seeders/PackAnimationCatalog.js"
   },
   "author": "",

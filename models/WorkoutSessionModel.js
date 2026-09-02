@@ -22,6 +22,7 @@ const sessionExerciseSchema = new mongoose.Schema({
     customExercise: {type: mongoose.Schema.Types.ObjectId, ref: 'CustomExercise'},
     name: {type: String, required: true, trim: true},
     muscle: {type: String, trim: true},
+    primaryMuscle: {type: String, trim: true},
     equipment: {type: String, trim: true},
     mode: {type: String, enum: ['weights', 'time'], default: 'weights'},
     weightUnit: {type: String, enum: ['kg', 'lb'], default: 'kg'},

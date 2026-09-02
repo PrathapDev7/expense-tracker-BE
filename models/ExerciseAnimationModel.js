@@ -86,6 +86,39 @@ const exerciseAnimationSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+
+    /* --------------------------------------------------- derived, not shipped */
+
+    // The catalog's own `muscle` is one of ten coarse values -- ARMS covers every
+    // curl, pushdown and wrist curl alike -- which is enough to filter a dropdown
+    // and not enough to label an exercise or draw a chart worth reading. These
+    // three are derived from the exercise name by services/exerciseTaxonomy and
+    // written by services/exerciseMetadata. `muscle` stays exactly as it was
+    // because the animation endpoints filter on it.
+    //
+    // Not required: they are absent on a freshly seeded row until the metadata
+    // pass runs, and a row without them is still a usable animation.
+    primaryMuscle: {
+        type: String,
+        trim: true,
+    },
+    secondaryMuscles: {
+        type: [String],
+        default: [],
+    },
+    // Numbered steps for the exercise sheet and the notes field, in order.
+    instructions: {
+        type: [String],
+        default: [],
+    },
+    // The hash of the rule file that produced the three fields above. This is
+    // what makes the metadata pass idempotent and self-updating: editing the
+    // rules changes the hash, and every row still carrying the old one is
+    // rewritten on the next boot. Rows added to the catalog later have no
+    // version at all, so they are picked up by the same query.
+    metadataVersion: {
+        type: String,
+    },
 }, {timestamps: true, minimize: false});
 
 // Every list query filters on some combination of these three, and all three are
@@ -93,5 +126,10 @@ const exerciseAnimationSchema = new mongoose.Schema({
 // it. It also lets the filter endpoint's distinct() calls scan the index.
 exerciseAnimationSchema.index({gender: 1, equipment: 1, muscle: 1});
 exerciseAnimationSchema.index({name: 1});
+
+// The picker filters on the fine muscle now, and every boot asks how many rows
+// are still on an old rule version.
+exerciseAnimationSchema.index({primaryMuscle: 1});
+exerciseAnimationSchema.index({metadataVersion: 1});
 
 module.exports = mongoose.model('ExerciseAnimation', exerciseAnimationSchema);

@@ -26,6 +26,14 @@ const db = async () => {
     // so the worst an early request sees is a short catalog, not a crash.
     const {startAnimationSeeder} = require('../services/animationCatalog');
     startAnimationSeeder();
+
+    // Same reasoning, and it waits for the catalog on its own: the metadata is
+    // derived from the exercise names, so it has nothing to annotate until the
+    // rows exist. Editing services/exerciseTaxonomy changes the rules hash,
+    // which is what makes the next boot rewrite every row without anyone having
+    // to run a script.
+    const {startMetadataSeeder} = require('../services/exerciseMetadata');
+    startMetadataSeeder();
 };
 
 module.exports = {db};

@@ -10,7 +10,7 @@ const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
-const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation, getExerciseCatalog} = require('../controllers/exerciseAnimation');
+const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation, getExerciseCatalog, getExerciseCatalogMuscles, seedExerciseMetadata} = require('../controllers/exerciseAnimation');
 const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises} = require('../controllers/workoutPlan');
 const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
 const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
@@ -126,6 +126,10 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-exercise-equipments', authenticateUser, getExerciseEquipments)
     .get('/get-exercise-animation', authenticateUser, getExerciseAnimation)
     .get('/get-exercise-catalog', authenticateUser, getExerciseCatalog)
+    .get('/get-exercise-catalog-muscles', authenticateUser, getExerciseCatalogMuscles)
+    // Boot reseeds on its own whenever the rules change; this is the on-demand
+    // door for a host where restarting or reaching a shell is awkward.
+    .post('/seed-exercise-metadata', authenticateUser, seedExerciseMetadata)
     .get('/get-workout-plans', authenticateUser, getWorkoutPlans)
     .get('/get-active-workout-plan', authenticateUser, getActiveWorkoutPlan)
     .get('/get-workout-plan/:id', authenticateUser, getWorkoutPlan)

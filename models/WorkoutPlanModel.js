@@ -35,6 +35,13 @@ const routineExerciseSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    // The fine muscle, copied in alongside the coarse one for the same reason
+    // the name is: the summary chart is drawn from what the routine recorded,
+    // not from a lookup that could answer differently later.
+    primaryMuscle: {
+        type: String,
+        trim: true,
+    },
     equipment: {
         type: String,
         trim: true,

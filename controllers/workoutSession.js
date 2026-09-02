@@ -23,6 +23,7 @@ const snapshotRoutine = (routine) => routine.exercises.map((exercise, index) => 
     customExercise: exercise.customExercise,
     name: exercise.name,
     muscle: exercise.muscle,
+    primaryMuscle: exercise.primaryMuscle,
     equipment: exercise.equipment,
     mode: exercise.mode,
     weightUnit: exercise.weightUnit,
@@ -275,7 +276,10 @@ const buildSummary = (session) => {
         const done = exercise.sets.filter((set) => set.completed);
         if (!done.length) return;
 
-        const muscle = exercise.muscle || 'Other';
+        // The fine muscle first: the coarse one collapses biceps, triceps and
+        // forearms into a single "ARMS" slice, which is a chart that cannot tell
+        // you what you trained.
+        const muscle = exercise.primaryMuscle || exercise.muscle || 'Other';
         byMuscle[muscle] = (byMuscle[muscle] || 0) + done.length;
         completedSets += done.length;
 
@@ -343,7 +347,7 @@ exports.getWorkoutSessions = async (req, res) => {
 
         const sessions = await WorkoutSessionSchema
             .find(filter)
-            .select('planName routineName status startedAt finishedAt durationSec exercises.name exercises.muscle exercises.sets.completed')
+            .select('planName routineName status startedAt finishedAt durationSec exercises.name exercises.muscle exercises.primaryMuscle exercises.sets.completed')
             .sort({startedAt: -1})
             .limit(resolveLimit(req.query.limit))
             .skip(Number.parseInt(req.query.skip, 10) || 0)
@@ -452,6 +456,7 @@ exports.getPreviousExercises = async (req, res) => {
                 catalogId: 1,
                 customExercise: 1,
                 muscle: 1,
+                primaryMuscle: 1,
                 equipment: 1,
                 lastPerformedAt: 1,
                 timesPerformed: 1,
