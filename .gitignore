@@ -53,9 +53,13 @@ Thumbs.db
 .cache/
 
 # Minified compositions produced by Seeders/BuildAnimationIndexFromArchive.js
-Seeders/data/vfe_lottie/
-Seeders/data/vfe_animation_index.enriched.json
+Seeders/data/lottie_assets/
+Seeders/data/exercise_animation_index.enriched.json
 
-# Compositions embedded per line by Seeders/FetchVfeLottie.js (~92 MB).
-# Regenerable with "npm run fetchVfeLottie"; the API reads them from Mongo.
-Seeders/data/vfe_animation_index_lottie.json
+# The raw catalog Seeders/FetchAnimations.js writes (~92 MB) is too big for git.
+# Its gzipped twin, exercise_animations.json.gz (~12 MB), IS committed --
+# that is what lets a deployed host seed itself. The trailing slash-free path
+# below matches only the .json, so the .gz is not caught by it.
+# Regenerate with "npm run fetchAnimations" then "npm run packAnimations".
+Seeders/data/exercise_animations.json
+Seeders/data/exercise_animations.json.gz.partial

@@ -7,8 +7,9 @@
     "start": "nodemon index.js",
     "updateExpenseType": "node Seeders/SeedExpenseType.js",
     "fetchExercises": "node Seeders/FetchExerciseCatalog.js",
-    "fetchVfeLottie": "node Seeders/FetchVfeLottie.js",
-    "seedAnimations": "node Seeders/SeedExerciseAnimations.js"
+    "fetchAnimations": "node Seeders/FetchAnimations.js",
+    "seedAnimations": "node Seeders/SeedExerciseAnimations.js",
+    "packAnimations": "node Seeders/PackAnimationCatalog.js"
   },
   "author": "",
   "license": "ISC",
