@@ -129,7 +129,14 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-exercise-catalog-muscles', authenticateUser, getExerciseCatalogMuscles)
     // Boot reseeds on its own whenever the rules change; this is the on-demand
     // door for a host where restarting or reaching a shell is awkward.
-    .post('/seed-exercise-metadata', authenticateUser, seedExerciseMetadata)
+    //
+    // Deliberately unauthenticated so it can be triggered from a browser or a
+    // bare curl. It writes nothing a caller controls -- the text is derived from
+    // committed rules, so the worst an anonymous call does is rewrite the rows
+    // with exactly what they already say -- but it is 1,603 reads and four bulk
+    // writes per call, which is worth a guard again once the catalog is seeded.
+    .post('/seed-exercise-metadata', seedExerciseMetadata)
+    .get('/seed-exercise-metadata', seedExerciseMetadata)
     .get('/get-workout-plans', authenticateUser, getWorkoutPlans)
     .get('/get-active-workout-plan', authenticateUser, getActiveWorkoutPlan)
     .get('/get-workout-plan/:id', authenticateUser, getWorkoutPlan)
