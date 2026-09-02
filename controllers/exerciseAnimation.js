@@ -123,3 +123,101 @@ exports.getExerciseAnimation = async (req, res) => {
         res.status(500).json({message: 'Server Error'});
     }
 };
+
+/* ------------------------------------------------------ the exercise picker */
+
+const HealthProfileSchema = require('../models/HealthProfileModel');
+
+// The health profile speaks male/female/other; the catalog speaks Men/Women.
+const CATALOG_GENDER = {male: 'Men', female: 'Women'};
+
+// User input goes into a $regex, so anything the regex engine would treat as
+// syntax has to be neutered first -- otherwise a search for "Squat (" throws.
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Resolves which gender's animations this user should be shown.
+ *
+ * An explicit query parameter wins, then the health profile, then Men as the
+ * arbitrary fallback. This only decides which of a pair of animations is
+ * preferred -- it never removes an exercise from the list.
+ */
+const preferredGender = async (req) => {
+    if (req.query.gender) return req.query.gender;
+
+    const profile = await HealthProfileSchema
+        .findOne({user: req.user.id})
+        .select('healthProfile.gender')
+        .lean();
+
+    const stated = profile && profile.healthProfile && profile.healthProfile.gender;
+
+    return CATALOG_GENDER[stated] || 'Men';
+};
+
+/**
+ * The exercise picker's catalog feed.
+ *
+ * The stored catalog is gendered: 1,603 rows collapse to 1,077 distinct
+ * (name, muscle, equipment) movements, 526 of which exist as a Men/Women pair
+ * and the rest in one gender only. Filtering by gender the way the animation
+ * dropdowns do would therefore hide 345 exercises from a woman and 206 from a
+ * man, so this groups the pair away instead and lets gender pick which
+ * animation plays -- every movement stays reachable either way.
+ */
+exports.getExerciseCatalog = async (req, res) => {
+    try {
+        const gender = await preferredGender(req);
+
+        const match = {};
+        if (req.query.muscle) match.muscle = req.query.muscle;
+        if (req.query.equipment) match.equipment = req.query.equipment;
+
+        // "Exercise name or muscle" -- one box over both fields.
+        if (req.query.search && req.query.search.trim()) {
+            const pattern = new RegExp(escapeRegex(req.query.search.trim()), 'i');
+            match.$or = [{name: pattern}, {muscle: pattern}];
+        }
+
+        const limit = resolveLimit(req.query.limit);
+        const skip = Number.parseInt(req.query.skip, 10) || 0;
+
+        const rows = await ExerciseAnimationSchema.aggregate([
+            {$match: match},
+            // 0 sorts before 1, so the preferred gender's row is the one $first
+            // keeps for each movement.
+            {$addFields: {preference: {$cond: [{$eq: ['$gender', gender]}, 0, 1]}}},
+            {$sort: {name: 1, muscle: 1, equipment: 1, preference: 1}},
+            {$group: {
+                _id: {name: '$name', muscle: '$muscle', equipment: '$equipment'},
+                catalogId: {$first: '$_id'},
+                gender: {$first: '$gender'},
+                width: {$first: '$width'},
+                height: {$first: '$height'},
+                durationMs: {$first: '$durationMs'},
+                // Both animations, so the app can swap without another round trip
+                // if the user changes the gender they train with.
+                variants: {$push: {gender: '$gender', catalogId: '$_id'}},
+            }},
+            {$sort: {'_id.name': 1}},
+            {$skip: skip},
+            {$limit: limit},
+            {$project: {
+                _id: 0,
+                catalogId: 1,
+                name: '$_id.name',
+                muscle: '$_id.muscle',
+                equipment: '$_id.equipment',
+                gender: 1,
+                width: 1,
+                height: 1,
+                durationMs: 1,
+                variants: 1,
+            }},
+        ]);
+
+        res.status(200).json({data: rows, gender, skip, limit});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};

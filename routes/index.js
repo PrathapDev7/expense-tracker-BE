@@ -10,7 +10,10 @@ const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
-const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation} = require('../controllers/exerciseAnimation');
+const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation, getExerciseCatalog} = require('../controllers/exerciseAnimation');
+const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises} = require('../controllers/workoutPlan');
+const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
+const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
 const CalorieEntry = require('../models/CalorieEntryModel');
 const { processEntry } = require('../services/groq');
@@ -122,6 +125,38 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-exercise-muscles', authenticateUser, getExerciseMuscles)
     .get('/get-exercise-equipments', authenticateUser, getExerciseEquipments)
     .get('/get-exercise-animation', authenticateUser, getExerciseAnimation)
+    .get('/get-exercise-catalog', authenticateUser, getExerciseCatalog)
+    .get('/get-workout-plans', authenticateUser, getWorkoutPlans)
+    .get('/get-active-workout-plan', authenticateUser, getActiveWorkoutPlan)
+    .get('/get-workout-plan/:id', authenticateUser, getWorkoutPlan)
+    .post('/add-workout-plan', authenticateUser, addWorkoutPlan)
+    .put('/update-workout-plan/:id', authenticateUser, updateWorkoutPlan)
+    .post('/duplicate-workout-plan/:id', authenticateUser, duplicateWorkoutPlan)
+    .delete('/delete-workout-plan/:id', authenticateUser, deleteWorkoutPlan)
+    .put('/reorder-workout-plans', authenticateUser, reorderWorkoutPlans)
+    .post('/add-routine/:planId', authenticateUser, addRoutine)
+    .put('/update-routine/:planId/:routineId', authenticateUser, updateRoutine)
+    .delete('/delete-routine/:planId/:routineId', authenticateUser, deleteRoutine)
+    .put('/reorder-routines/:planId', authenticateUser, reorderRoutines)
+    .post('/add-routine-exercise/:planId/:routineId', authenticateUser, addRoutineExercise)
+    .put('/update-routine-exercise/:planId/:routineId/:exerciseId', authenticateUser, updateRoutineExercise)
+    .delete('/delete-routine-exercise/:planId/:routineId/:exerciseId', authenticateUser, deleteRoutineExercise)
+    .put('/reorder-routine-exercises/:planId/:routineId', authenticateUser, reorderRoutineExercises)
+    .get('/get-custom-exercises', authenticateUser, getCustomExercises)
+    .post('/add-custom-exercise', authenticateUser, addCustomExercise)
+    .put('/update-custom-exercise/:id', authenticateUser, updateCustomExercise)
+    .delete('/delete-custom-exercise/:id', authenticateUser, deleteCustomExercise)
+    .post('/start-workout-session', authenticateUser, startWorkoutSession)
+    .get('/get-active-workout-session', authenticateUser, getActiveWorkoutSession)
+    .get('/get-workout-sessions', authenticateUser, getWorkoutSessions)
+    .get('/get-workout-session/:id', authenticateUser, getWorkoutSession)
+    .post('/add-workout-session-set/:id/:exerciseId', authenticateUser, addWorkoutSessionSet)
+    .put('/update-workout-session-set/:id/:exerciseId/:setId', authenticateUser, updateWorkoutSessionSet)
+    .delete('/delete-workout-session-set/:id/:exerciseId/:setId', authenticateUser, deleteWorkoutSessionSet)
+    .post('/finish-workout-session/:id', authenticateUser, finishWorkoutSession)
+    .delete('/delete-workout-session/:id', authenticateUser, deleteWorkoutSession)
+    .get('/get-exercise-history', authenticateUser, getExerciseHistory)
+    .get('/get-previous-exercises', authenticateUser, getPreviousExercises)
     .post('/login', loginUser)
     .post('/register', registerUser)
     .get('/', baseAction)
