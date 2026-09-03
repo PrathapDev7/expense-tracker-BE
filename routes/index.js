@@ -13,7 +13,7 @@ const {getInsights} = require('../controllers/insights');
 const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation, getExerciseCatalog, getExerciseCatalogMuscles, seedExerciseMetadata} = require('../controllers/exerciseAnimation');
 const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises} = require('../controllers/workoutPlan');
 const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
-const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
+const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getWorkoutStats, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
 const CalorieEntry = require('../models/CalorieEntryModel');
 const { processEntry } = require('../services/groq');
@@ -160,6 +160,7 @@ router.post('/add-income', authenticateUser, addIncome)
     .post('/start-workout-session', authenticateUser, startWorkoutSession)
     .get('/get-active-workout-session', authenticateUser, getActiveWorkoutSession)
     .get('/get-workout-sessions', authenticateUser, getWorkoutSessions)
+    .get('/get-workout-stats', authenticateUser, getWorkoutStats)
     .get('/get-workout-session/:id', authenticateUser, getWorkoutSession)
     .post('/add-workout-session-set/:id/:exerciseId', authenticateUser, addWorkoutSessionSet)
     .put('/update-workout-session-set/:id/:exerciseId/:setId', authenticateUser, updateWorkoutSessionSet)

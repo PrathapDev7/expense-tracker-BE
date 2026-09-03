@@ -444,6 +444,7 @@ exports.getPreviousExercises = async (req, res) => {
                 catalogId: {$first: '$exercises.catalogId'},
                 customExercise: {$first: '$exercises.customExercise'},
                 muscle: {$first: '$exercises.muscle'},
+                primaryMuscle: {$first: '$exercises.primaryMuscle'},
                 equipment: {$first: '$exercises.equipment'},
                 lastPerformedAt: {$max: '$startedAt'},
                 timesPerformed: {$sum: 1},
@@ -464,6 +465,72 @@ exports.getPreviousExercises = async (req, res) => {
         ]);
 
         res.status(200).json({data: rows});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};
+
+/**
+ * Everything the Fitness stats page charts, for one date range, in a single
+ * round trip.
+ *
+ * Bucketing into days is left to the app on purpose: the server does not know
+ * which timezone the user is in, and a workout logged at 11pm belongs to that
+ * day on their phone rather than to the next one in UTC.
+ */
+exports.getWorkoutStats = async (req, res) => {
+    try {
+        const filter = {user: req.user.id, status: {$ne: 'active'}};
+
+        if (req.query.from || req.query.to) {
+            filter.startedAt = {};
+            if (req.query.from) filter.startedAt.$gte = new Date(req.query.from);
+            if (req.query.to) filter.startedAt.$lte = new Date(req.query.to);
+        }
+
+        const sessions = await WorkoutSessionSchema
+            .find(filter)
+            .select('planName routineName status startedAt finishedAt durationSec exercises.muscle exercises.primaryMuscle exercises.sets')
+            .sort({startedAt: -1})
+            .lean();
+
+        const byMuscle = {};
+        const totals = {workouts: 0, durationSec: 0, completedSets: 0, volume: 0};
+
+        const rows = sessions.map((session) => {
+            const summary = buildSummary(session);
+
+            totals.workouts += 1;
+            totals.durationSec += summary.durationSec || 0;
+            totals.completedSets += summary.completedSets;
+            totals.volume += summary.volume;
+
+            summary.muscles.forEach(({muscle, count}) => {
+                byMuscle[muscle] = (byMuscle[muscle] || 0) + count;
+            });
+
+            return {
+                _id: session._id,
+                planName: session.planName,
+                routineName: session.routineName,
+                status: session.status,
+                startedAt: session.startedAt,
+                finishedAt: session.finishedAt,
+                durationSec: session.durationSec,
+                exerciseCount: summary.exerciseCount,
+                completedSets: summary.completedSets,
+            };
+        });
+
+        res.status(200).json({
+            data: {
+                totals,
+                muscles: Object.entries(byMuscle)
+                    .map(([muscle, count]) => ({muscle, count}))
+                    .sort((a, b) => b.count - a.count),
+                sessions: rows,
+            },
+        });
     } catch (error) {
         res.status(500).json({message: 'Server Error'});
     }
