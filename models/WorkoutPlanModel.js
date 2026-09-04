@@ -96,9 +96,11 @@ const routineSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // Two minutes: a routine should open with a usable rest gap rather than
+    // "0m 0s", which reads as a setting the user forgot to fill in.
     restBetweenExercisesSec: {
         type: Number,
-        default: 0,
+        default: 120,
         min: 0,
     },
     exercises: {
