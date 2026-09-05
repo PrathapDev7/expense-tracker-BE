@@ -467,3 +467,75 @@ exports.reorderRoutineExercises = async (req, res) => {
         res.status(500).json({message: 'Server Error'});
     }
 };
+
+/* -------------------------------------------------------- routine builder --- */
+
+/**
+ * Drafts a week from a short brief, and redrafts it from a change request.
+ *
+ * Stateless on purpose: the client sends the plan it is looking at back with
+ * the change ("swap the squats"), so nothing here has to remember a
+ * conversation, and a draft can be revised from any device.
+ */
+exports.buildRoutines = async (req, res) => {
+    try {
+        const {buildPlan} = require('../services/workoutPlanner');
+
+        const plan = await buildPlan({
+            brief: req.body.brief || {},
+            current: req.body.current,
+            request: req.body.request,
+        });
+
+        res.status(200).json({message: 'Plan drafted', data: plan});
+    } catch (error) {
+        // 502 rather than 500: every model in the chain failed or answered with
+        // something unparseable, which is worth retrying rather than a bug.
+        console.error(`[planner] ${error.message || error}`);
+        res.status(502).json({message: 'Could not draft a plan right now. Try again.'});
+    }
+};
+
+/**
+ * Writes an accepted draft over the plan.
+ *
+ * The whole routine tree is replaced, not merged: the builder writes a fresh
+ * week, and folding it into what was already there would leave a plan that is
+ * neither. The client confirms that with the user first.
+ */
+exports.applyBuiltRoutines = async (req, res) => {
+    const {routines} = req.body;
+
+    try {
+        if (!Array.isArray(routines) || !routines.length) {
+            return res.status(400).json({message: 'routines is required.'});
+        }
+
+        const plan = await findPlan(req);
+        if (!plan) {
+            return res.status(404).json({message: 'Workout plan not found'});
+        }
+
+        plan.routines = routines.slice(0, 7).map((routine, index) => ({
+            name: String(routine.name || '').trim().slice(0, 60) || `Day ${index + 1}`,
+            order: index,
+            restBetweenExercisesSec: Number(routine.restBetweenExercisesSec) || 0,
+            exercises: (Array.isArray(routine.exercises) ? routine.exercises : [])
+                .filter((exercise) => exercise && String(exercise.name || '').trim())
+                .map((exercise, position) => {
+                    const built = {order: position};
+                    EXERCISE_FIELDS.forEach((key) => {
+                        if (exercise[key] !== undefined) built[key] = exercise[key];
+                    });
+                    built.name = String(exercise.name).trim();
+                    return built;
+                }),
+        }));
+
+        await plan.save();
+
+        res.status(200).json({message: 'Plan built', data: plan});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};

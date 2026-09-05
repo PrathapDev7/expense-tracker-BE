@@ -11,7 +11,7 @@ const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
 const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseAnimation, getExerciseCatalog, getExerciseCatalogMuscles, seedExerciseMetadata} = require('../controllers/exerciseAnimation');
-const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises} = require('../controllers/workoutPlan');
+const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises, buildRoutines, applyBuiltRoutines} = require('../controllers/workoutPlan');
 const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
 const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getWorkoutStats, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
@@ -153,6 +153,8 @@ router.post('/add-income', authenticateUser, addIncome)
     .put('/update-routine-exercise/:planId/:routineId/:exerciseId', authenticateUser, updateRoutineExercise)
     .delete('/delete-routine-exercise/:planId/:routineId/:exerciseId', authenticateUser, deleteRoutineExercise)
     .put('/reorder-routine-exercises/:planId/:routineId', authenticateUser, reorderRoutineExercises)
+    .post('/build-routines', authenticateUser, buildRoutines)
+    .post('/apply-built-routines/:planId', authenticateUser, applyBuiltRoutines)
     .get('/get-custom-exercises', authenticateUser, getCustomExercises)
     .post('/add-custom-exercise', authenticateUser, addCustomExercise)
     .put('/update-custom-exercise/:id', authenticateUser, updateCustomExercise)
