@@ -331,7 +331,7 @@ exports.reorderRoutines = async (req, res) => {
 /* --------------------------------------------------- routine exercises --- */
 
 const EXERCISE_FIELDS = [
-    'catalogId', 'customExercise', 'name', 'muscle', 'primaryMuscle', 'equipment', 'mode',
+    'catalogId', 'gif', 'customExercise', 'name', 'muscle', 'primaryMuscle', 'equipment', 'mode',
     'weightUnit', 'sets', 'restBetweenSetsSec', 'color', 'notes',
 ];
 

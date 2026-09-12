@@ -20,6 +20,13 @@ const routineExerciseSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    // The CSV id's demo gif path (e.g. '/exercise-gifs/0001.gif'), copied in
+    // alongside the denormalized fields below: the app renders the thumbnail
+    // straight from this without another lookup.
+    gif: {
+        type: String,
+        trim: true,
+    },
     // Set instead of catalogId for a user's own exercise ("Add custom").
     customExercise: {
         type: mongoose.Schema.Types.ObjectId,

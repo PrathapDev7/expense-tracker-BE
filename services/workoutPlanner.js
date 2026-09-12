@@ -235,6 +235,7 @@ async function decorate(plan) {
 
             return {
                 catalogId: match?.catalogId,
+                gif: match?.gif,
                 name: match?.name || exercise.name,
                 muscle: match?.muscle || '',
                 primaryMuscle,

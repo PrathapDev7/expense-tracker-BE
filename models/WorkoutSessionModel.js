@@ -19,6 +19,7 @@ const performedSetSchema = new mongoose.Schema({
 // say you did.
 const sessionExerciseSchema = new mongoose.Schema({
     catalogId: {type: String, trim: true},
+    gif: {type: String, trim: true},
     customExercise: {type: mongoose.Schema.Types.ObjectId, ref: 'CustomExercise'},
     name: {type: String, required: true, trim: true},
     muscle: {type: String, trim: true},

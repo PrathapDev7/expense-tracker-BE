@@ -20,6 +20,7 @@ const resolveLimit = (raw) => {
  */
 const snapshotRoutine = (routine) => routine.exercises.map((exercise, index) => ({
     catalogId: exercise.catalogId,
+    gif: exercise.gif,
     customExercise: exercise.customExercise,
     name: exercise.name,
     muscle: exercise.muscle,
@@ -442,6 +443,7 @@ exports.getPreviousExercises = async (req, res) => {
             {$group: {
                 _id: '$exercises.name',
                 catalogId: {$first: '$exercises.catalogId'},
+                gif: {$first: '$exercises.gif'},
                 customExercise: {$first: '$exercises.customExercise'},
                 muscle: {$first: '$exercises.muscle'},
                 primaryMuscle: {$first: '$exercises.primaryMuscle'},
@@ -455,6 +457,7 @@ exports.getPreviousExercises = async (req, res) => {
                 _id: 0,
                 name: '$_id',
                 catalogId: 1,
+                gif: 1,
                 customExercise: 1,
                 muscle: 1,
                 primaryMuscle: 1,
