@@ -20,20 +20,11 @@ const db = async () => {
         console.log('User Index Sync Error', error);
     }
 
-    // Deliberately not awaited: a cold animation seed takes seconds against a
-    // local mongod and minutes against Atlas, and the API has no reason to stay
-    // down while it runs. Every route that needs the catalog reads it from Mongo,
-    // so the worst an early request sees is a short catalog, not a crash.
-    const {startAnimationSeeder} = require('../services/animationCatalog');
-    startAnimationSeeder();
-
-    // Same reasoning, and it waits for the catalog on its own: the metadata is
-    // derived from the exercise names, so it has nothing to annotate until the
-    // rows exist. Editing services/exerciseTaxonomy changes the rules hash,
-    // which is what makes the next boot rewrite every row without anyone having
-    // to run a script.
-    const {startMetadataSeeder} = require('../services/exerciseMetadata');
-    startMetadataSeeder();
+    // One-time migration: drops the legacy Lottie collection and loads the CSV
+    // catalog with gif paths. Guarded by a marker so it runs at most once per
+    // database; later CSV edits are a manual `npm run seedExercises`.
+    const {startExerciseSeeder} = require('../services/exerciseCatalog');
+    startExerciseSeeder();
 };
 
 module.exports = {db};

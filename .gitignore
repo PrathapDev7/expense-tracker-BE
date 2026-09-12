@@ -49,17 +49,5 @@ Thumbs.db
 *.mov
 *.wmv
 
-# Runtime animation cache (fetched on demand, regenerable)
+# Runtime cache (fetched on demand, regenerable)
 .cache/
-
-# Minified compositions produced by Seeders/BuildAnimationIndexFromArchive.js
-Seeders/data/lottie_assets/
-Seeders/data/exercise_animation_index.enriched.json
-
-# The raw catalog Seeders/FetchAnimations.js writes (~92 MB) is too big for git.
-# Its gzipped twin, exercise_animations.json.gz (~12 MB), IS committed --
-# that is what lets a deployed host seed itself. The trailing slash-free path
-# below matches only the .json, so the .gz is not caught by it.
-# Regenerate with "npm run fetchAnimations" then "npm run packAnimations".
-Seeders/data/exercise_animations.json
-Seeders/data/exercise_animations.json.gz.partial

@@ -1,15 +1,15 @@
-const ExerciseAnimationSchema = require('../models/ExerciseAnimationModel');
+const Exercise = require('../models/ExerciseModel');
 const {chatCompletionWithFallback} = require('./aiModels');
 
 /**
  * "Build me a routine": turns a short brief into a week of routines, then
  * pins every exercise it names to a real catalog entry.
  *
- * The model is asked for exercise *names*, not ids -- the catalog is 1,603
+ * The model is asked for exercise *names*, not ids -- the catalog is 1,324
  * rows and will not fit in a prompt, and a model asked to echo ids invents
- * them. Matching happens here instead, against the same grouped view the
- * picker lists, so a generated routine carries the animation, the fine muscle
- * and the instructions a hand-picked one does.
+ * them. Matching happens here instead, against the same catalog the picker
+ * lists, so a generated routine carries the target muscle, the gif and the
+ * instructions a hand-picked one does.
  */
 
 const SYSTEM_PROMPT = `You are an experienced strength coach writing a training week for one person.
@@ -139,22 +139,17 @@ let cache = null;
 async function catalogIndex() {
     if (cache && Date.now() - cache.at < 60_000) return cache.rows;
 
-    const rows = await ExerciseAnimationSchema.aggregate([
-        {$sort: {name: 1, muscle: 1, equipment: 1, gender: 1}},
-        {$group: {
-            _id: {name: '$name', muscle: '$muscle', equipment: '$equipment'},
-            catalogId: {$first: '$_id'},
-            primaryMuscle: {$first: '$primaryMuscle'},
-            instructions: {$first: '$instructions'},
-        }},
+    const rows = await Exercise.aggregate([
+        {$sort: {name: 1}},
         {$project: {
             _id: 0,
-            catalogId: 1,
-            primaryMuscle: 1,
+            catalogId: '$_id',
+            name: 1,
+            muscle: '$target',
+            equipment: 1,
+            primaryMuscle: '$target',
             instructions: 1,
-            name: '$_id.name',
-            muscle: '$_id.muscle',
-            equipment: '$_id.equipment',
+            gif: 1,
         }},
     ]);
 
