@@ -114,6 +114,25 @@ const routineSchema = new mongoose.Schema({
     },
 }, {timestamps: true});
 
+// What the user told the "Build me a routine" flow, kept so a later
+// "Update with AI" turn still knows the injuries, dislikes and tweaks from
+// the original conversation. History is capped on write; the latest turn is
+// what matters most, the earliest is what gets dropped first.
+const builderConversationSchema = new mongoose.Schema({
+    brief: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
+    },
+    history: {
+        type: [String],
+        default: [],
+    },
+    updatedAt: {
+        type: Date,
+        default: null,
+    },
+}, {_id: false});
+
 const reminderSchema = new mongoose.Schema({
     // 0 = Sunday, matching Date#getDay so the client does not have to remap.
     dayOfWeek: {
@@ -174,6 +193,13 @@ const workoutPlanSchema = new mongoose.Schema({
     routines: {
         type: [routineSchema],
         default: [],
+    },
+    // The builder conversation behind the current routines. Stored on the plan
+    // (not the routine) because "Build me a routine" writes a whole week, and
+    // a later "Update with AI" refines that same week.
+    builderConversation: {
+        type: builderConversationSchema,
+        default: undefined,
     },
 }, {timestamps: true});
 

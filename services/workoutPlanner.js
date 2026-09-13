@@ -45,8 +45,8 @@ Rules:
 - Respect the equipment available. Bodyweight briefs must not name a barbell or machine.
 - Respect the session length: roughly 6 minutes per exercise including rest.
 - Balance the week: nothing trains the same muscle hard on back-to-back days.
-- Heavier compounds get longer rest (120-180s), isolation shorter (45-90s).
-- Honour every constraint in the brief, including injuries and dislikes.`;
+- Rest: the brief's default rest between sets applies to every exercise unless a lift genuinely needs otherwise (heavier compounds get longer, isolation shorter). Prefer the default.
+- Honour every constraint in the brief, including injuries and dislikes. When earlier instructions conflict with a later change request, the later one wins but the earlier ones still apply wherever they do not conflict.`;
 
 /* ------------------------------------------------------------ generation -- */
 
@@ -57,6 +57,9 @@ function briefToText(brief = {}) {
     if (brief.level) lines.push(`Experience: ${brief.level}`);
     if (brief.equipment) lines.push(`Equipment available: ${brief.equipment}`);
     if (brief.minutes) lines.push(`Session length: about ${brief.minutes} minutes`);
+    if (brief.defaultRestSec !== undefined) {
+        lines.push(`Default rest between sets: ${brief.defaultRestSec} seconds — use this for every exercise unless a lift genuinely needs otherwise`);
+    }
     if (brief.notes) lines.push(`Also: ${brief.notes}`);
     return lines.length ? lines.join('\n') : 'Build a balanced 3-day full-body week for a beginner in a full gym.';
 }
@@ -84,6 +87,7 @@ const clamp = (value, min, max, fallback) => {
  */
 function normalise(parsed, brief = {}) {
     const wantedDays = clamp(brief.days, 1, 7, 0);
+    const defaultRest = clamp(brief.defaultRestSec, 0, 600, 90);
     const routines = (Array.isArray(parsed.routines) ? parsed.routines : [])
         .filter((routine) => routine && Array.isArray(routine.exercises) && routine.exercises.length)
         .slice(0, wantedDays || 7)
@@ -102,7 +106,9 @@ function normalise(parsed, brief = {}) {
                         sets: clamp(exercise.sets, 1, 8, 3),
                         reps: seconds ? null : clamp(exercise.reps, 1, 50, 10),
                         seconds,
-                        restSec: clamp(exercise.restSec, 0, 600, 90),
+                        restSec: exercise.restSec === undefined || exercise.restSec === null
+                            ? defaultRest
+                            : clamp(exercise.restSec, 0, 600, defaultRest),
                     };
                 }),
         }));
@@ -264,18 +270,34 @@ async function decorate(plan) {
  * One turn of the builder: the first call carries only the brief, and every
  * "actually, make it shorter" carries the plan on screen plus the change, so
  * the model edits rather than starts over.
+ *
+ * `history` is every instruction so far — the brief's notes first, then each
+ * change request in order. The latest change is sent as the request; the rest
+ * travel as earlier instructions so nothing the user said is forgotten.
  */
-async function buildPlan({brief, current, request}) {
+async function buildPlan({brief, current, request, history}) {
+    const prior = Array.isArray(history)
+        ? history.map((line) => String(line || '').trim()).filter(Boolean)
+        : [];
+    const latest = String(request || '').trim();
+
     const messages = [
         {role: 'system', content: SYSTEM_PROMPT},
         {role: 'user', content: briefToText(brief)},
     ];
 
-    if (current && request) {
+    if (current && latest) {
+        const earlier = prior.filter((line) => line !== latest);
+        if (earlier.length) {
+            messages.push({
+                role: 'user',
+                content: `Earlier instructions (still apply unless this change overrides them):\n${earlier.map((line, i) => `${i + 1}. ${line}`).join('\n')}`,
+            });
+        }
         messages.push({role: 'assistant', content: JSON.stringify(current)});
         messages.push({
             role: 'user',
-            content: `Change request: ${request}\n\nReturn the complete updated plan as JSON in the same shape, keeping everything the request does not touch.`,
+            content: `Change request: ${latest}\n\nReturn the complete updated plan as JSON in the same shape, keeping everything the request does not touch.`,
         });
     }
 
@@ -291,4 +313,133 @@ async function buildPlan({brief, current, request}) {
     return decorate(plan);
 }
 
-module.exports = {buildPlan};
+/**
+ * "Update with AI": refines the routines a plan already has instead of writing
+ * a fresh week. The stored builder conversation (brief + history) travels back
+ * in as context, the plan on screen is what gets edited, and the change
+ * request says what to do differently.
+ *
+ * Unlike [buildPlan], there is no day count to hit and no session length to
+ * fit — the week keeps its shape and only what the request touches changes.
+ */
+const REFINE_SYSTEM_PROMPT = `You are an experienced strength coach editing one person's existing training week.
+
+CRITICAL: reply with ONE raw JSON object. No markdown, no code fences, no commentary.
+
+Shape:
+{
+  "summary": "<one sentence, max 14 words, describing what changed>",
+  "routines": [
+    {
+      "name": "<keep the existing day name unless the request renames it>",
+      "focus": "<2-4 words naming what it trains>",
+      "exercises": [
+        {
+          "name": "<widely used gym exercise name>",
+          "muscle": "<the main muscle worked>",
+          "equipment": "<barbell | dumbbell | machine | cable | bodyweight | kettlebell | band>",
+          "sets": <2-5>,
+          "reps": <4-20, omit for a timed hold>,
+          "seconds": <10-120, only for a timed hold such as a plank>,
+          "restSec": <30-180>
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Keep the same routines in the same order unless the request adds, removes or renames one. Never rewrite the whole week unasked.
+- Keep every exercise, its sets, reps and rest exactly as they are unless the request touches them.
+- Use exercise names as they are commonly written in a gym. Never invent names, never add brand names, never number them.
+- Respect the stored context: injuries, dislikes and equipment from the original conversation still apply.
+- When the request conflicts with earlier instructions, the request wins but the earlier ones still apply wherever they do not conflict.`;
+
+/** A stored builder brief back into prose, so it reads as context. */
+function storedBriefToText(brief = {}) {
+    const lines = [];
+    if (brief.goal) lines.push(`Goal: ${brief.goal}`);
+    if (brief.level) lines.push(`Experience: ${brief.level}`);
+    if (brief.equipment) lines.push(`Equipment available: ${brief.equipment}`);
+    if (brief.minutes) lines.push(`Session length: about ${brief.minutes} minutes`);
+    if (brief.defaultRestSec !== undefined) {
+        lines.push(`Default rest between sets: ${brief.defaultRestSec} seconds`);
+    }
+    if (brief.notes) lines.push(`Also: ${brief.notes}`);
+    return lines.join('\n');
+}
+
+/** A saved routine back into the compact shape the model already speaks. */
+function routineToCompact(routine = {}) {
+    return {
+        name: routine.name || '',
+        focus: '',
+        exercises: (Array.isArray(routine.exercises) ? routine.exercises : [])
+            .filter((exercise) => exercise && exercise.name)
+            .map((exercise) => {
+                const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
+                const first = sets[0] || {};
+                const compact = {
+                    name: exercise.name,
+                    muscle: exercise.primaryMuscle || exercise.muscle || '',
+                    equipment: exercise.equipment || '',
+                    sets: sets.length || 3,
+                };
+                if (first.durationSec) compact.seconds = first.durationSec;
+                else if (first.reps) compact.reps = first.reps;
+                if (exercise.restBetweenSetsSec !== undefined) {
+                    compact.restSec = exercise.restBetweenSetsSec;
+                }
+                return compact;
+            }),
+    };
+}
+
+async function refinePlan({routines, brief, history, request}) {
+    const current = (Array.isArray(routines) ? routines : [])
+        .map(routineToCompact)
+        .filter((routine) => routine.exercises.length);
+    if (!current.length) throw new Error('There is nothing to refine yet');
+
+    const prior = Array.isArray(history)
+        ? history.map((line) => String(line || '').trim()).filter(Boolean)
+        : [];
+    const latest = String(request || '').trim();
+    if (!latest) throw new Error('A change request is required');
+
+    const stored = storedBriefToText(brief || {});
+    const messages = [{role: 'system', content: REFINE_SYSTEM_PROMPT}];
+    if (stored) {
+        messages.push({
+            role: 'user',
+            content: `Original context (still applies unless the change overrides it):\n${stored}`,
+        });
+    }
+    const earlier = prior.filter((line) => line !== latest);
+    if (earlier.length) {
+        messages.push({
+            role: 'user',
+            content: `Earlier instructions (still apply unless this change overrides them):\n${earlier.map((line, i) => `${i + 1}. ${line}`).join('\n')}`,
+        });
+    }
+    messages.push({role: 'assistant', content: JSON.stringify({routines: current})});
+    messages.push({
+        role: 'user',
+        content: `Change request: ${latest}\n\nReturn the complete updated plan as JSON in the same shape, keeping everything the request does not touch.`,
+    });
+
+    const {text} = await chatCompletionWithFallback({
+        messages,
+        temperature: 0.4,
+        max_tokens: 3000,
+    });
+
+    // No day count to enforce on a refine, and the default rest falls back to
+    // whatever the stored brief asked for.
+    const plan = normalise(extractJson(text), {days: current.length, defaultRestSec: brief?.defaultRestSec});
+    if (!plan.routines.length) throw new Error('The planner returned no routines');
+
+    return decorate(plan);
+}
+
+module.exports = {buildPlan, refinePlan};

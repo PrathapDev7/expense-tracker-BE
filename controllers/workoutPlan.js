@@ -485,6 +485,7 @@ exports.buildRoutines = async (req, res) => {
             brief: req.body.brief || {},
             current: req.body.current,
             request: req.body.request,
+            history: req.body.history,
         });
 
         res.status(200).json({message: 'Plan drafted', data: plan});
@@ -497,6 +498,116 @@ exports.buildRoutines = async (req, res) => {
 };
 
 /**
+ * "Update with AI": drafts a refined week from the routines a plan already
+ * has, using the stored builder conversation as context.
+ *
+ * Stateless like [buildRoutines]: the client sends the plan on screen plus
+ * the change, and the stored brief/history ride along so the model remembers
+ * the injuries and dislikes from the original build. Nothing is written until
+ * [applyRefinedRoutines].
+ */
+exports.refineRoutines = async (req, res) => {
+    try {
+        const {refinePlan} = require('../services/workoutPlanner');
+
+        const plan = await findPlan(req);
+        if (!plan) {
+            return res.status(404).json({message: 'Workout plan not found'});
+        }
+
+        const lean = plan.toObject();
+        const stored = lean.builderConversation || {};
+
+        const draft = await refinePlan({
+            routines: Array.isArray(req.body.routines) && req.body.routines.length
+                ? req.body.routines
+                : lean.routines,
+            brief: stored.brief || {},
+            history: stored.history || [],
+            request: req.body.request,
+        });
+
+        res.status(200).json({message: 'Plan refined', data: draft});
+    } catch (error) {
+        // Same 502 contract as the builder: the model failed or rambled.
+        console.error(`[planner] ${error.message || error}`);
+        const status = /nothing to refine|change request is required/i.test(error.message || '')
+            ? 400
+            : 502;
+        res.status(status).json({message: status === 400 ? error.message : 'Could not refine the plan right now. Try again.'});
+    }
+};
+
+/**
+ * Writes an accepted refinement over the plan.
+ *
+ * Same replace semantics as [applyBuiltRoutines] — the model returns the whole
+ * week and the plan takes it — but the stored conversation is extended with
+ * the change rather than replaced, so the next refinement remembers this one
+ * too. Routine ids are matched by name and order so history-carrying fields
+ * the model never sees (rest between exercises) survive the write.
+ */
+exports.applyRefinedRoutines = async (req, res) => {
+    const {routines, request} = req.body;
+
+    try {
+        if (!Array.isArray(routines) || !routines.length) {
+            return res.status(400).json({message: 'routines is required.'});
+        }
+
+        const plan = await findPlan(req);
+        if (!plan) {
+            return res.status(404).json({message: 'Workout plan not found'});
+        }
+
+        const previous = plan.toObject().routines || [];
+        plan.routines = routines.slice(0, 7).map((routine, index) => {
+            const name = String(routine.name || '').trim().slice(0, 60) || `Day ${index + 1}`;
+            // The model keeps names and order unless asked otherwise, so the
+            // match is usually exact; fall back to position when it renamed.
+            const carry = previous.find((r) => String(r.name) === name) || previous[index] || {};
+            return {
+                name,
+                order: index,
+                restBetweenExercisesSec: Number(routine.restBetweenExercisesSec) || Number(carry.restBetweenExercisesSec) || 0,
+                exercises: (Array.isArray(routine.exercises) ? routine.exercises : [])
+                    .filter((exercise) => exercise && String(exercise.name || '').trim())
+                    .map((exercise, position) => {
+                        const built = {order: position};
+                        EXERCISE_FIELDS.forEach((key) => {
+                            if (exercise[key] !== undefined) built[key] = exercise[key];
+                        });
+                        built.name = String(exercise.name).trim();
+                        return built;
+                    }),
+            };
+        });
+
+        // The conversation grows: this change joins the stored history so the
+        // next "update" still knows about it. Capped like the builder's.
+        const trimmed = String(request || '').trim();
+        if (trimmed) {
+            const stored = plan.builderConversation || {};
+            const history = [
+                ...((Array.isArray(stored.history) ? stored.history : []).map((line) => String(line || '').trim()).filter(Boolean)),
+                trimmed,
+            ].slice(-20);
+            plan.builderConversation = {
+                brief: stored.brief || null,
+                history,
+                updatedAt: new Date(),
+            };
+        }
+
+        await plan.save();
+
+        res.status(200).json({message: 'Plan refined', data: plan});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};
+
+/**
  * Writes an accepted draft over the plan.
  *
  * The whole routine tree is replaced, not merged: the builder writes a fresh
@@ -504,7 +615,7 @@ exports.buildRoutines = async (req, res) => {
  * neither. The client confirms that with the user first.
  */
 exports.applyBuiltRoutines = async (req, res) => {
-    const {routines} = req.body;
+    const {routines, brief, history} = req.body;
 
     try {
         if (!Array.isArray(routines) || !routines.length) {
@@ -531,6 +642,27 @@ exports.applyBuiltRoutines = async (req, res) => {
                     return built;
                 }),
         }));
+
+        // Stash the conversation the week was built from, so a later
+        // "Update with AI" refines with the same injuries, dislikes and
+        // tweaks in context. Only when the client sends one — manual edits
+        // and legacy drafts leave whatever is stored alone, and a capped
+        // history keeps the document small.
+        if (brief !== undefined || history !== undefined) {
+            const lines = Array.isArray(history)
+                ? history.map((line) => String(line || '').trim()).filter(Boolean).slice(-20)
+                : undefined;
+            const cleanBrief = brief && typeof brief === 'object' && !Array.isArray(brief)
+                ? brief
+                : undefined;
+            if (cleanBrief || (lines && lines.length)) {
+                plan.builderConversation = {
+                    ...(cleanBrief ? {brief: cleanBrief} : {}),
+                    history: lines || [],
+                    updatedAt: new Date(),
+                };
+            }
+        }
 
         await plan.save();
 
