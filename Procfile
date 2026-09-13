@@ -1,1 +1,1 @@
-web: nodemon ./indexex.js --omit=dev
+web: node ./index.js

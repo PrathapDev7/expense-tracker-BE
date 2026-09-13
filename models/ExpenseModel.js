@@ -35,6 +35,10 @@ const ExpenseSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    recurringId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Recurring',
+    },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

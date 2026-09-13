@@ -24,6 +24,10 @@ readdirSync('./routes').map((route) => app.use('/api/v1/', require('./routes/' +
 
 const server = () => {
     db();
+    if (process.env.ENABLE_CRON !== 'false') {
+        const {startScheduler} = require('./services/scheduler');
+        startScheduler();
+    }
     app.listen(PORT, () => {
         console.log('listening to port:', PORT);
     });

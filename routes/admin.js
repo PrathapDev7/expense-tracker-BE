@@ -4,6 +4,7 @@ const {
     getAdminTransactions,
     getAdminWallets,
     getAdminGoals,
+    getAdminTransfers,
 } = require('../controllers/admin');
 
 const router = require('express').Router();
@@ -21,6 +22,7 @@ router
     .get('/admin/users', authenticateAdmin, getAdminUsers)
     .get('/admin/transactions', authenticateAdmin, getAdminTransactions)
     .get('/admin/wallets', authenticateAdmin, getAdminWallets)
-    .get('/admin/goals', authenticateAdmin, getAdminGoals);
+    .get('/admin/goals', authenticateAdmin, getAdminGoals)
+    .get('/admin/transfers', authenticateAdmin, getAdminTransfers);
 
 module.exports = router;

@@ -6,16 +6,19 @@ const {addCategory, getCategories, getRecentCategories, updateCategory, deleteCa
 const {addSubCategory, getSubCategories} = require('../controllers/subCategory');
 const {getStats, getProfile, baseAction} = require('../controllers/Common');
 const {uploadImage, uploadImageMiddleware} = require('../controllers/upload');
-const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('../controllers/recurring');
+const {addRecurring, getRecurring, updateRecurring, deleteRecurring, getUpcomingBills, markBill} = require('../controllers/recurring');
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
 const {addWishlistItem, getWishlistItems, updateWishlistItem, deleteWishlistItem} = require('../controllers/wishlist');
-const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
+const {addWallet, getWallets, updateWallet, deleteWallet, getDebts} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
 const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseBodyParts, getExerciseAnimation, getExerciseCatalog, getExerciseCatalogMuscles, seedExercises} = require('../controllers/exercise');
 const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises, buildRoutines, applyBuiltRoutines, refineRoutines, applyRefinedRoutines} = require('../controllers/workoutPlan');
+const {getUserPreferences, updateUserPreferences} = require('../controllers/preferences');
 const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
 const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getWorkoutStats, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
+const {addTransfer, getTransfers, deleteTransfer} = require('../controllers/transfer');
+const {getNotifications, readNotification, registerPushToken} = require('../controllers/notifications');
 const CalorieEntry = require('../models/CalorieEntryModel');
 const { processEntry } = require('../services/groq');
 const jwt = require('jsonwebtoken');
@@ -97,6 +100,8 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-recurring',authenticateUser, getRecurring)
     .put('/update-recurring/:id',authenticateUser, updateRecurring)
     .delete('/delete-recurring/:id',authenticateUser, deleteRecurring)
+    .get('/get-upcoming-bills',authenticateUser, getUpcomingBills)
+    .post('/mark-bill/:id',authenticateUser, markBill)
     .post('/add-goal',authenticateUser, addGoal)
     .get('/get-goals',authenticateUser, getGoals)
     .put('/update-goal/:id',authenticateUser, updateGoal)
@@ -110,6 +115,15 @@ router.post('/add-income', authenticateUser, addIncome)
     .get('/get-wallets',authenticateUser, getWallets)
     .put('/update-wallet/:id',authenticateUser, updateWallet)
     .delete('/delete-wallet/:id',authenticateUser, deleteWallet)
+    .get('/get-debts',authenticateUser, getDebts)
+    .post('/add-transfer',authenticateUser, addTransfer)
+    .get('/get-transfers',authenticateUser, getTransfers)
+    .delete('/delete-transfer/:id',authenticateUser, deleteTransfer)
+    .get('/get-notifications',authenticateUser, getNotifications)
+    .put('/read-notification/:id',authenticateUser, readNotification)
+    .post('/register-push-token',authenticateUser, registerPushToken)
+    .get('/get-preferences',authenticateUser, getUserPreferences)
+    .put('/update-preferences',authenticateUser, updateUserPreferences)
     .get('/get-insights',authenticateUser, getInsights)
     .get('/get-profile',authenticateUser, getProfile)
     .post('/update-password',authenticateUser, updatePassword)

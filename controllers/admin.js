@@ -4,6 +4,8 @@ const IncomeSchema = require('../models/IncomeModel');
 const GoalSchema = require('../models/GoalModel');
 const WalletSchema = require('../models/WalletModel');
 const RecurringSchema = require('../models/RecurringModel');
+const TransferSchema = require('../models/TransferModel');
+const NotificationSchema = require('../models/NotificationModel');
 const moment = require('moment');
 
 exports.getAdminStats = async (req, res) => {
@@ -198,6 +200,33 @@ exports.getAdminGoals = async (req, res) => {
 
         res.status(200).json({
             goals: goals.map((g) => ({ ...g, _id: String(g._id) })),
+            total,
+            page,
+            limit,
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.getAdminTransfers = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page ?? '1');
+        const limit = parseInt(req.query.limit ?? '20');
+        const skip = (page - 1) * limit;
+
+        const [transfers, total] = await Promise.all([
+            TransferSchema.find({})
+                .populate('user', 'username mobile')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            TransferSchema.countDocuments(),
+        ]);
+
+        res.status(200).json({
+            transfers: transfers.map((t) => ({ ...t, _id: String(t._id) })),
             total,
             page,
             limit,

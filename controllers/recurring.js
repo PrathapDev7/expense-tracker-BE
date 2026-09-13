@@ -53,26 +53,35 @@ const materializeRecurring = async (userId) => {
                 break;
             }
 
-            const Model = rule.kind === 'income' ? IncomeSchema : ExpenseSchema;
-            const doc = {
-                amount: rule.amount,
-                category: rule.category,
-                description: rule.description,
-                date: rule.nextRunDate,
-                user: userId,
-                type: rule.type || (rule.kind === 'income' ? 'income' : 'self'),
-                account,
-            };
-            if (rule.kind === 'income') {
-                doc.title = rule.title;
-            } else {
-                doc.sub_category = rule.sub_category;
+            const skipped = (rule.skippedDates || []).includes(rule.nextRunDate);
+            const occurrence = rule.nextRunDate;
+
+            if (!skipped && rule.autoCreate !== false) {
+                const Model = rule.kind === 'income' ? IncomeSchema : ExpenseSchema;
+                const doc = {
+                    amount: rule.amount,
+                    category: rule.category,
+                    description: rule.description,
+                    date: occurrence,
+                    user: userId,
+                    type: rule.type || (rule.kind === 'income' ? 'income' : 'self'),
+                    account,
+                    recurringId: rule._id,
+                };
+                if (rule.kind === 'income') {
+                    doc.title = rule.title;
+                } else {
+                    doc.sub_category = rule.sub_category;
+                }
+
+                await Model.create(doc);
+                rule.lastStatus = 'created';
+            } else if (skipped) {
+                rule.lastStatus = 'skipped';
             }
 
-            await Model.create(doc);
-
-            rule.lastRunDate = rule.nextRunDate;
-            rule.nextRunDate = advanceDate(rule.nextRunDate, rule.frequency, rule.interval);
+            rule.lastRunDate = occurrence;
+            rule.nextRunDate = advanceDate(occurrence, rule.frequency, rule.interval);
             guard += 1;
         }
         await rule.save();
@@ -83,7 +92,8 @@ exports.materializeRecurring = materializeRecurring;
 
 exports.addRecurring = async (req, res) => {
     const {kind, amount, category, sub_category, title, description, type,
-        account, frequency, interval, startDate, endDate} = req.body;
+        account, frequency, interval, startDate, endDate,
+        isBill, autoCreate, remindBeforeDays} = req.body;
 
     try {
         if (!kind || !amount || !category || !frequency || !startDate) {
@@ -109,6 +119,9 @@ exports.addRecurring = async (req, res) => {
             startDate,
             nextRunDate: startDate,
             endDate,
+            isBill: isBill === true,
+            autoCreate: autoCreate !== false,
+            remindBeforeDays: remindBeforeDays !== undefined ? remindBeforeDays : 2,
         });
 
         // Backfill anything already due (e.g. a start date in the past).
@@ -135,7 +148,8 @@ exports.getRecurring = async (req, res) => {
 exports.updateRecurring = async (req, res) => {
     const {id} = req.params;
     const allowed = ['kind', 'amount', 'category', 'sub_category', 'title', 'description',
-        'type', 'account', 'frequency', 'interval', 'startDate', 'endDate', 'nextRunDate', 'active'];
+        'type', 'account', 'frequency', 'interval', 'startDate', 'endDate', 'nextRunDate', 'active',
+        'isBill', 'autoCreate', 'remindBeforeDays'];
 
     try {
         const rule = await RecurringSchema.findOne({_id: id, user: req.user.id});
@@ -173,6 +187,58 @@ exports.deleteRecurring = async (req, res) => {
             return res.status(404).json({message: 'Recurring rule not found'});
         }
         res.status(200).json({message: 'Recurring deleted'});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};
+
+exports.getUpcomingBills = async (req, res) => {
+    try {
+        const today = moment().format(DATE_FMT);
+        const rules = await RecurringSchema.find({
+            user: req.user.id,
+            active: true,
+            isBill: true,
+        }).sort({nextRunDate: 1});
+        const data = rules.map((r) => {
+            const obj = r.toObject();
+            return {
+                ...obj,
+                overdue: obj.nextRunDate < today,
+            };
+        });
+        res.status(200).json({data});
+    } catch (error) {
+        res.status(500).json({message: 'Server Error'});
+    }
+};
+
+exports.markBill = async (req, res) => {
+    const {id} = req.params;
+    const {date, status} = req.body;
+    try {
+        if (!['paid', 'skipped'].includes(status)) {
+            return res.status(400).json({message: 'status must be paid or skipped.'});
+        }
+        const rule = await RecurringSchema.findOne({_id: id, user: req.user.id});
+        if (!rule) {
+            return res.status(404).json({message: 'Recurring rule not found'});
+        }
+        const target = date || rule.nextRunDate;
+        if (status === 'paid') {
+            if (!rule.paidDates.includes(target)) rule.paidDates.push(target);
+            rule.lastStatus = 'paid';
+        } else {
+            if (!rule.skippedDates.includes(target)) rule.skippedDates.push(target);
+            rule.lastStatus = 'skipped';
+        }
+        if (target === rule.nextRunDate) {
+            rule.lastRunDate = target;
+            rule.nextRunDate = advanceDate(target, rule.frequency, rule.interval);
+            if (rule.endDate && rule.nextRunDate > rule.endDate) rule.active = false;
+        }
+        await rule.save();
+        res.status(200).json({message: `Bill marked ${status}`, data: rule});
     } catch (error) {
         res.status(500).json({message: 'Server Error'});
     }

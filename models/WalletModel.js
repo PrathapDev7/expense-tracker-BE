@@ -57,6 +57,27 @@ const WalletSchema = new mongoose.Schema({
         min: 1,
         max: 31,
     },
+    owedBalance: {
+        type: Number,
+        default: 0,
+    },
+    creditLimit: {
+        type: Number,
+        min: 0,
+    },
+    apr: {
+        type: Number,
+        min: 0,
+    },
+    minPayment: {
+        type: Number,
+        min: 0,
+    },
+    dueDay: {
+        type: Number,
+        min: 1,
+        max: 31,
+    },
     expiry: {
         type: String,
         trim: true,

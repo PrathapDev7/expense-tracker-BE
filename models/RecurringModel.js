@@ -74,6 +74,32 @@ const RecurringSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
+    isBill: {
+        type: Boolean,
+        default: false,
+    },
+    autoCreate: {
+        type: Boolean,
+        default: true,
+    },
+    remindBeforeDays: {
+        type: Number,
+        default: 2,
+        min: 0,
+    },
+    lastStatus: {
+        type: String,
+        enum: ['created', 'skipped', 'paid'],
+        default: 'created',
+    },
+    paidDates: {
+        type: [String],
+        default: [],
+    },
+    skippedDates: {
+        type: [String],
+        default: [],
+    },
 }, {timestamps: true});
 
 RecurringSchema.index({user: 1, active: 1, nextRunDate: 1});
