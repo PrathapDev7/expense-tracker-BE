@@ -8,10 +8,11 @@ const {getStats, getProfile, baseAction} = require('../controllers/Common');
 const {uploadImage, uploadImageMiddleware} = require('../controllers/upload');
 const {addRecurring, getRecurring, updateRecurring, deleteRecurring} = require('../controllers/recurring');
 const {addGoal, getGoals, updateGoal, contributeGoal, deleteGoal} = require('../controllers/goal');
+const {addWishlistItem, getWishlistItems, updateWishlistItem, deleteWishlistItem} = require('../controllers/wishlist');
 const {addWallet, getWallets, updateWallet, deleteWallet} = require('../controllers/wallet');
 const {getInsights} = require('../controllers/insights');
 const {getExercises, getExerciseMuscles, getExerciseEquipments, getExerciseBodyParts, getExerciseAnimation, getExerciseCatalog, getExerciseCatalogMuscles, seedExercises} = require('../controllers/exercise');
-const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises, buildRoutines, applyBuiltRoutines} = require('../controllers/workoutPlan');
+const {getWorkoutPlans, getWorkoutPlan, getActiveWorkoutPlan, addWorkoutPlan, updateWorkoutPlan, duplicateWorkoutPlan, deleteWorkoutPlan, reorderWorkoutPlans, addRoutine, updateRoutine, deleteRoutine, reorderRoutines, addRoutineExercise, updateRoutineExercise, deleteRoutineExercise, reorderRoutineExercises, buildRoutines, applyBuiltRoutines, refineRoutines, applyRefinedRoutines} = require('../controllers/workoutPlan');
 const {getCustomExercises, addCustomExercise, updateCustomExercise, deleteCustomExercise} = require('../controllers/customExercise');
 const {startWorkoutSession, getActiveWorkoutSession, updateWorkoutSessionSet, addWorkoutSessionSet, deleteWorkoutSessionSet, finishWorkoutSession, getWorkoutSession, deleteWorkoutSession, getWorkoutSessions, getWorkoutStats, getExerciseHistory, getPreviousExercises} = require('../controllers/workoutSession');
 const {addCalories, processFoodText, getDailyCalories, deleteMealItem, updateCalorieGoals, calculateGoals, getCalorieHistory, addWeightEntry, getWeightHistory, deleteWeightEntry, updateTargetWeight} = require('../controllers/calories');
@@ -101,6 +102,10 @@ router.post('/add-income', authenticateUser, addIncome)
     .put('/update-goal/:id',authenticateUser, updateGoal)
     .post('/contribute-goal/:id',authenticateUser, contributeGoal)
     .delete('/delete-goal/:id',authenticateUser, deleteGoal)
+    .post('/add-wishlist-item',authenticateUser, addWishlistItem)
+    .get('/get-wishlist-items',authenticateUser, getWishlistItems)
+    .put('/update-wishlist-item/:id',authenticateUser, updateWishlistItem)
+    .delete('/delete-wishlist-item/:id',authenticateUser, deleteWishlistItem)
     .post('/add-wallet',authenticateUser, addWallet)
     .get('/get-wallets',authenticateUser, getWallets)
     .put('/update-wallet/:id',authenticateUser, updateWallet)
@@ -149,6 +154,8 @@ router.post('/add-income', authenticateUser, addIncome)
     .put('/reorder-routine-exercises/:planId/:routineId', authenticateUser, reorderRoutineExercises)
     .post('/build-routines', authenticateUser, buildRoutines)
     .post('/apply-built-routines/:planId', authenticateUser, applyBuiltRoutines)
+    .post('/refine-routines/:planId', authenticateUser, refineRoutines)
+    .post('/apply-refined-routines/:planId', authenticateUser, applyRefinedRoutines)
     .get('/get-custom-exercises', authenticateUser, getCustomExercises)
     .post('/add-custom-exercise', authenticateUser, addCustomExercise)
     .put('/update-custom-exercise/:id', authenticateUser, updateCustomExercise)
